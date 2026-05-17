@@ -1,0 +1,35 @@
+{
+  "sample": "Elexon MID APXMIDP 2024-01-01 to 2024-01-02",
+  "row_count": 49,
+  "asset": {
+    "name": "phase2-reference-2h-50mw",
+    "power_mw": 50.0,
+    "energy_capacity_mwh": 100.0,
+    "round_trip_efficiency": 0.81,
+    "eta_charge": 0.9,
+    "eta_discharge": 0.9,
+    "soc_min_mwh": 0.0,
+    "soc_max_mwh": 100.0
+  },
+  "terminal_soc_policy": "cyclic",
+  "binary_dispatch": true,
+  "total_revenue_gbp": 7739.142777777777,
+  "annualised_gbp_per_mw_year": 55342.76794557822,
+  "charged_mwh": 230.55555555555554,
+  "discharged_mwh": 186.75,
+  "equivalent_throughput_cycles": 2.0865277777777775,
+  "average_buy_price_gbp_per_mwh": 23.938795180722895,
+  "average_sell_price_gbp_per_mwh": 70.9952610441767,
+  "solver": {
+    "solver_name": "appsi_highs",
+    "status": "ok",
+    "termination_condition": "optimal",
+    "objective_value": 7739.142777777778,
+    "wall_time_seconds": 0.03752783999880194,
+    "time_limit_seconds": 60,
+    "mip_gap": 0.001,
+    "best_bound": 7739.142777777778
+  },
+  "source_caveat": "Elexon BMRS Market Index Data is a public wholesale proxy, not day-ahead execution price.",
+  "month_run_note": "One-month single-request fetch returned HTTP 400; full-month refresh should be chunked through the data workflow."
+}

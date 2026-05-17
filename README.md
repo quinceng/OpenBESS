@@ -13,6 +13,10 @@ known-time metadata and reproducible tests. It is not a commercial trading syste
 - Raw cache, processed Parquet writing, dataset manifests and quality reports.
 - Network-free unit tests plus optional live integration smoke tests.
 
+## Implemented Modelling Scope
+
+- Phase 2 energy-only perfect-foresight optimiser for a single battery.
+
 ## Setup
 
 ```bash
@@ -39,4 +43,5 @@ GB_BESS_RUN_INTEGRATION=1 uv run pytest -m integration
 ```bash
 uv run gb-bess fetch-data --source ELEXON_BMRS_MID --start 2024-01-01T00:00Z --end 2024-01-01T01:00Z
 uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
+uv run gb-bess run-smoke
 ```

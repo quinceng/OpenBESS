@@ -1,0 +1,22 @@
+run_id: phase2-smoke
+asset:
+  name: phase2-reference-2h
+  power_mw: 1
+  energy_capacity_mwh: 2
+  eta_charge: 1
+  eta_discharge: 1
+data:
+  raw_root: data/raw
+  processed_root: data/processed
+  reference_root: data/reference
+  schema_version: 0.1.0
+  known_at_policy: fixture_known
+solver:
+  name: highs
+  time_limit_seconds: 60
+  mip_gap: 0.001
+market:
+  wholesale_source_id: PROJECT_CONVENTION
+  wholesale_provider: APXMIDP
+  eac_source_id: NESO_EAC_AUCTION_RESULTS
+  cm_source_id: CM_OFFICIAL_AUCTION_PARAMETERS

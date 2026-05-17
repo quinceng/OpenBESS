@@ -15,3 +15,12 @@ def test_cli_exposes_fetch_data_subcommand() -> None:
 
     assert result.exit_code == 0
     assert "--source" in result.output
+
+
+def test_cli_exposes_run_smoke_subcommand() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["run-smoke", "--help"])
+
+    assert result.exit_code == 0
+    assert "--output-dir" in result.output
