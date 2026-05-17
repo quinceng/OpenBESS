@@ -88,3 +88,28 @@ def test_dispatch_input_rejects_initial_soc_outside_bounds() -> None:
             terminal_soc_policy="cyclic",
             binary_dispatch=True,
         )
+
+
+def test_dispatch_input_accepts_explicit_terminal_target() -> None:
+    dispatch_input = build_dispatch_input(
+        [_price_point(1, 10), _price_point(2, 100)],
+        asset=_asset(),
+        initial_soc_mwh=1,
+        terminal_soc_policy="target",
+        terminal_soc_target_mwh=0.5,
+        binary_dispatch=True,
+    )
+
+    assert dispatch_input.terminal_soc_policy == "target"
+    assert dispatch_input.terminal_soc_target_mwh == pytest.approx(0.5)
+
+
+def test_dispatch_input_rejects_missing_terminal_target() -> None:
+    with pytest.raises(ValueError, match="terminal_soc_target_mwh"):
+        build_dispatch_input(
+            [_price_point(1, 10), _price_point(2, 100)],
+            asset=_asset(),
+            initial_soc_mwh=1,
+            terminal_soc_policy="target",
+            binary_dispatch=True,
+        )

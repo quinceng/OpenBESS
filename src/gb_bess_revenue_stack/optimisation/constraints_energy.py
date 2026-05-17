@@ -53,3 +53,8 @@ def add_energy_dispatch_constraints(model: Any, dispatch_input: DispatchInput) -
         model.terminal_soc_constraint = pyo.Constraint(
             expr=model.soc_mwh[dispatch_input.period_count] == dispatch_input.initial_soc_mwh
         )
+    if dispatch_input.terminal_soc_policy == "target":
+        model.terminal_soc_constraint = pyo.Constraint(
+            expr=model.soc_mwh[dispatch_input.period_count]
+            == dispatch_input.terminal_soc_target_mwh
+        )

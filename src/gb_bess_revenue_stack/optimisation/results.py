@@ -70,6 +70,7 @@ class DispatchResult(BaseModel):
     metrics: DispatchMetrics
     solver: SolverDiagnostics
     terminal_soc_policy: str
+    terminal_soc_target_mwh: float | None = None
     binary_dispatch: bool
     initial_soc_mwh: float
     final_soc_mwh: float
@@ -143,6 +144,7 @@ def extract_dispatch_result(model: Any, solver: SolverDiagnostics) -> DispatchRe
         metrics=metrics,
         solver=solver,
         terminal_soc_policy=dispatch_input.terminal_soc_policy,
+        terminal_soc_target_mwh=dispatch_input.terminal_soc_target_mwh,
         binary_dispatch=dispatch_input.binary_dispatch,
         initial_soc_mwh=dispatch_input.initial_soc_mwh,
         final_soc_mwh=_value(model.soc_mwh[dispatch_input.period_count]),

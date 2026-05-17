@@ -124,6 +124,23 @@ def test_free_terminal_soc_shows_end_drain_artifact() -> None:
     assert free.final_soc_mwh < cyclic.final_soc_mwh
 
 
+def test_explicit_terminal_target_is_enforced() -> None:
+    dispatch_input = build_dispatch_input(
+        [_point(1, 10), _point(2, 100)],
+        asset=_asset(),
+        initial_soc_mwh=1,
+        terminal_soc_policy="target",
+        terminal_soc_target_mwh=0.5,
+        binary_dispatch=True,
+    )
+    model = build_energy_dispatch_model(dispatch_input)
+    diagnostics = solve_dispatch_model(model)
+    result = extract_dispatch_result(model, diagnostics)
+
+    assert result.final_soc_mwh == pytest.approx(0.5)
+    assert result.terminal_soc_target_mwh == pytest.approx(0.5)
+
+
 def test_binary_mode_prevents_simultaneous_charge_and_discharge() -> None:
     result = _solve([-20, -20, 80, 80])
 

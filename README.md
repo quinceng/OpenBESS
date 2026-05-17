@@ -16,6 +16,7 @@ known-time metadata and reproducible tests. It is not a commercial trading syste
 ## Implemented Modelling Scope
 
 - Phase 2 energy-only perfect-foresight optimiser for a single battery.
+- Phase 2.5 rolling-horizon policy wrapper with no-leakage information sets, simple forecast baselines, state carry-forward and capture-ratio reporting.
 
 ## Setup
 
@@ -44,4 +45,5 @@ GB_BESS_RUN_INTEGRATION=1 uv run pytest -m integration
 uv run gb-bess fetch-data --source ELEXON_BMRS_MID --start 2024-01-01T00:00Z --end 2024-01-01T01:00Z
 uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 uv run gb-bess run-smoke
+uv run gb-bess run-rolling-smoke
 ```

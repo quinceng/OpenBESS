@@ -9,7 +9,7 @@ from gb_bess_revenue_stack.config.models import AssetConfig
 from gb_bess_revenue_stack.schemas.base import ensure_aware_utc
 from gb_bess_revenue_stack.schemas.market import WholesalePricePoint
 
-TerminalSocPolicy = Literal["cyclic", "free"]
+TerminalSocPolicy = Literal["cyclic", "free", "target"]
 
 
 class DispatchPeriod(BaseModel):
@@ -55,6 +55,7 @@ class DispatchInput(BaseModel):
     eta_discharge: float = Field(gt=0, le=1)
     initial_soc_mwh: float = Field(ge=0)
     terminal_soc_policy: TerminalSocPolicy = "cyclic"
+    terminal_soc_target_mwh: float | None = Field(default=None, ge=0)
     binary_dispatch: bool = True
     data_manifest_ref: str | None = None
     config_hash: str | None = None
@@ -75,6 +76,13 @@ class DispatchInput(BaseModel):
         if not self.soc_min_mwh <= self.initial_soc_mwh <= self.soc_max_mwh:
             msg = "initial_soc_mwh must be within SoC bounds."
             raise ValueError(msg)
+        if self.terminal_soc_policy == "target":
+            if self.terminal_soc_target_mwh is None:
+                msg = "terminal_soc_target_mwh is required when terminal_soc_policy='target'."
+                raise ValueError(msg)
+            if not self.soc_min_mwh <= self.terminal_soc_target_mwh <= self.soc_max_mwh:
+                msg = "terminal_soc_target_mwh must be within SoC bounds."
+                raise ValueError(msg)
         starts = [period.delivery_start_utc for period in self.periods]
         if starts != sorted(starts):
             msg = "Dispatch periods must be ordered by delivery_start_utc."
@@ -91,6 +99,7 @@ def build_dispatch_input(
     asset: AssetConfig,
     initial_soc_mwh: float,
     terminal_soc_policy: TerminalSocPolicy = "cyclic",
+    terminal_soc_target_mwh: float | None = None,
     binary_dispatch: bool = True,
     data_manifest_ref: str | None = None,
     config_hash: str | None = None,
@@ -132,6 +141,7 @@ def build_dispatch_input(
         eta_discharge=eta_discharge,
         initial_soc_mwh=initial_soc_mwh,
         terminal_soc_policy=terminal_soc_policy,
+        terminal_soc_target_mwh=terminal_soc_target_mwh,
         binary_dispatch=binary_dispatch,
         data_manifest_ref=data_manifest_ref,
         config_hash=config_hash,

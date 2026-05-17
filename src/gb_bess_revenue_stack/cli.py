@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -24,6 +24,9 @@ from gb_bess_revenue_stack.optimisation.inputs import build_dispatch_input
 from gb_bess_revenue_stack.optimisation.model_factory import build_energy_dispatch_model
 from gb_bess_revenue_stack.optimisation.results import DispatchResult, extract_dispatch_result
 from gb_bess_revenue_stack.optimisation.solve import solve_dispatch_model
+from gb_bess_revenue_stack.policies.evaluation import evaluate_rolling_policy
+from gb_bess_revenue_stack.policies.forecasts import PreviousDaySamePeriodForecast
+from gb_bess_revenue_stack.policies.rolling import RollingConfig, RollingRun, run_rolling_policy
 from gb_bess_revenue_stack.schemas.base import parse_source_datetime
 from gb_bess_revenue_stack.schemas.market import WholesalePricePoint
 
@@ -175,6 +178,59 @@ def run_smoke(
     )
 
 
+@app.command()
+def run_rolling_smoke(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for the rolling smoke policy outputs."),
+    ] = Path("results/runs/phase2_5_rolling_smoke"),
+) -> None:
+    """Run a tiny network-free rolling-policy solve with one prior day of history."""
+
+    fixture_path = Path("tests/fixtures/phase2_toy_prices.csv")
+    history_records = _load_fixture_prices(fixture_path)
+    evaluation_records = [_shift_price_point(point, days=1) for point in history_records]
+    records = [*history_records, *evaluation_records]
+    asset = AssetConfig(
+        name="phase2-5-reference-2h",
+        power_mw=1,
+        energy_capacity_mwh=2,
+        eta_charge=1,
+        eta_discharge=1,
+    )
+    perfect = _solve_perfect_foresight(evaluation_records, asset)
+    rolling = run_rolling_policy(
+        prices=records,
+        asset=asset,
+        initial_soc_mwh=1,
+        forecast_model=PreviousDaySamePeriodForecast(),
+        config=RollingConfig(
+            horizon_periods=len(evaluation_records),
+            step_periods=1,
+            terminal_soc_policy="target",
+            terminal_soc_target_mwh=1,
+            evaluation_start_utc=evaluation_records[0].delivery_start_utc,
+        ),
+    )
+    evaluation = evaluate_rolling_policy(
+        rolling,
+        perfect_foresight_revenue_gbp=perfect.total_revenue_gbp,
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _write_dispatch_result(perfect, output_dir / "perfect_foresight_dispatch.json")
+    _write_rolling_run(rolling, output_dir / "rolling_run.json")
+    (output_dir / "policy_evaluation.json").write_text(
+        evaluation.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    capture = "n/a" if evaluation.capture_ratio is None else f"{evaluation.capture_ratio:.3f}"
+    typer.echo(
+        f"Solved rolling smoke: realised_gbp={rolling.realised_revenue_gbp:.2f}, "
+        f"perfect_gbp={perfect.total_revenue_gbp:.2f}, capture_ratio={capture}"
+    )
+
+
 def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
@@ -203,5 +259,41 @@ def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:
     return records
 
 
+def _shift_price_point(point: WholesalePricePoint, *, days: int) -> WholesalePricePoint:
+    shifted_start = point.delivery_start_utc + timedelta(days=days)
+    shifted_end = point.delivery_end_utc + timedelta(days=days)
+    return point.model_copy(
+        update={
+            "delivery_start_utc": shifted_start,
+            "delivery_end_utc": shifted_end,
+            "settlement_date": shifted_start.date().isoformat(),
+            "known_at_utc": point.known_at_utc + timedelta(days=days),
+            "retrieved_at_utc": point.retrieved_at_utc + timedelta(days=days),
+        }
+    )
+
+
+def _solve_perfect_foresight(
+    records: list[WholesalePricePoint],
+    asset: AssetConfig,
+) -> DispatchResult:
+    dispatch_input = build_dispatch_input(
+        records,
+        asset=asset,
+        initial_soc_mwh=1,
+        terminal_soc_policy="cyclic",
+        binary_dispatch=True,
+        data_manifest_ref="phase2_5_rolling_smoke",
+        config_hash="phase2-5-perfect-foresight-smoke",
+    )
+    model = build_energy_dispatch_model(dispatch_input)
+    diagnostics = solve_dispatch_model(model)
+    return extract_dispatch_result(model, diagnostics)
+
+
 def _write_dispatch_result(result: DispatchResult, path: Path) -> None:
+    path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _write_rolling_run(result: RollingRun, path: Path) -> None:
     path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
