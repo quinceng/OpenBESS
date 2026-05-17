@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "datasets": ["MID"]
+  },
+  "data": [
+    {
+      "startTime": "2024-01-01T00:00:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2024-01-01",
+      "settlementPeriod": 1,
+      "price": 36.51,
+      "volume": 664.4
+    },
+    {
+      "startTime": "2024-01-01T00:30:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2024-01-01",
+      "settlementPeriod": 2,
+      "price": -2.0,
+      "volume": 10.0
+    }
+  ]
+}

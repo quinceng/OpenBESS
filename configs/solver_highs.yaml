@@ -1,0 +1,3 @@
+name: highs
+time_limit_seconds: 300
+mip_gap: 0.001

@@ -1,0 +1,36 @@
+schema_version: 0.1.0
+source_id: NESO_EAC_AUCTION_RESULTS
+known_caveat: >
+  Direction labels are derived from verified product labels and project convention.
+  Re-check before any central EAC optimisation claim.
+products:
+  DCL:
+    model_label: dynamic_containment_low
+    direction_model_label: upward
+  DCH:
+    model_label: dynamic_containment_high
+    direction_model_label: downward
+  DML:
+    model_label: dynamic_moderation_low
+    direction_model_label: upward
+  DMH:
+    model_label: dynamic_moderation_high
+    direction_model_label: downward
+  DRL:
+    model_label: dynamic_regulation_low
+    direction_model_label: upward
+  DRH:
+    model_label: dynamic_regulation_high
+    direction_model_label: downward
+  PQR:
+    model_label: positive_quick_reserve
+    direction_model_label: upward
+  NQR:
+    model_label: negative_quick_reserve
+    direction_model_label: downward
+  PSR:
+    model_label: positive_slow_reserve
+    direction_model_label: upward
+  NSR:
+    model_label: negative_slow_reserve
+    direction_model_label: downward

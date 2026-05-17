@@ -1,0 +1,233 @@
+schema_version: 0.1.0
+purpose: Seed source registry for the GB BESS revenue-stack optimiser.
+maintenance_rule: >
+  Every external source used in code, configs, methodology, dashboard or benchmark
+  reconciliation must have a source_id in this registry.
+
+sources:
+  - source_id: ELEXON_BMRS_MID
+    name: Elexon BMRS Market Index Data price time series
+    owner: Elexon
+    status: verified
+    intended_use:
+      - wholesale_proxy_prices
+      - price_source_sensitivity
+    access:
+      type: api
+      url: https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index
+      documentation_url: https://bmrs.elexon.co.uk/api-documentation/endpoint/balancing/pricing/market-index
+      endpoint_path: /bmrs/api/v1/balancing/pricing/market-index
+      formats:
+        - json
+        - csv
+      query_parameters_verified:
+        - from
+        - to
+        - format
+        - dataProviders
+    verified_fields:
+      - startTime
+      - dataProvider
+      - settlementDate
+      - settlementPeriod
+      - price
+      - volume
+    verified_providers:
+      - N2EXMIDP
+      - APXMIDP
+    expected_units:
+      price: GBP/MWh
+      volume: source_field_preserved_not_used_in_central_model
+    canonical_dataset: wholesale_price_points
+    canonical_source_type: MID
+    proxy_caveat: >
+      Market Index Data is a public short-term wholesale proxy and must not be
+      labelled as day-ahead auction execution price.
+    known_at_policy: delivery_end_utc_conservative
+    licence: Elexon BMRS API terms
+    redistribution: cache raw production data locally only; commit only tiny permitted fixtures
+    phase1_decision: verified_for_public_wholesale_proxy_pipeline
+
+  - source_id: NESO_EAC_AUCTION_RESULTS
+    name: NESO Enduring Auction Capability auction results
+    owner: NESO
+    status: verified
+    intended_use:
+      - eac_availability_prices
+      - eac_product_coverage
+      - eac_known_time_policy
+    access:
+      type: data_portal
+      url: https://www.neso.energy/data-portal/eac-auction-results
+      api_package_url: https://api.neso.energy/api/3/action/package_show?id=eac-auction-results
+      resource_method: CKAN datastore and downloadable CSV resources
+      selected_resource:
+        name: NESO Response-Reserve Results Summary
+        resource_id: 596f29ac-0387-4ba4-a6d3-95c243140707
+      supplementary_resource:
+        name: NESO Response-Reserve Results By Unit
+        resource_id: a63ab354-7e68-44c2-ad96-c6f920c30e85
+    verified_fields:
+      - auctionID
+      - auctionProduct
+      - serviceType
+      - deliveryStart
+      - deliveryEnd
+      - clearedVolume
+      - clearingPrice
+      - linkedServiceWindowID
+    verified_timestamp_convention: UTC source convention; CSV values may omit trailing Z and parser normalises to UTC
+    verified_update_frequency: daily
+    licence: NESO Open Data Licence
+    rate_limit_guidance: CKAN 1 request per second; datastore 2 requests per minute
+    canonical_dataset: eac_auction_results
+    verified_product_labels:
+      - DCH
+      - DCL
+      - DMH
+      - DML
+      - DRH
+      - DRL
+      - NQR
+      - NSR
+      - PQR
+      - PSR
+    known_at_policy: delivery_start_utc_conservative_until_publication_time_verified
+    phase1_decision: verified_for_price_taking_availability_pipeline_with_publication_time_caveat
+
+  - source_id: NESO_EAC_MARKET_RULES
+    name: NESO EAC market rules and service-window documentation
+    owner: NESO
+    status: usable_with_caveat
+    intended_use:
+      - eac_service_registry
+      - service_window_duration
+      - block_commitment_rules
+      - gate_timing_policy
+    access:
+      type: documentation
+      url: https://sandbox.eac.neso.production.n-side.com/docs/market-participant/api/baskets/creating-co-optimised-baskets
+    research_findings:
+      - Quick Reserve uses 30-minute windows in the sandbox guide.
+      - Frequency response services use longer windows such as EFA blocks in the sandbox guide.
+      - Co-optimised baskets include validation rules around capacity, price, volume, baskets and splitting.
+    caveat: >
+      Sandbox/API-guide statements must be verified against the selected live
+      products and release-year rules before central use.
+    phase1_checks:
+      - Confirm delivery windows by product.
+      - Confirm whether central products require block-constant commitment.
+      - Confirm stacking or exclusivity assumptions.
+      - Confirm gate-closure and result timing where relevant to rolling decisions.
+
+  - source_id: NESO_FREQ_RESPONSE_MARKET_INFO_2023
+    name: NESO Frequency Response Market Information Report, November 2023
+    owner: NESO
+    status: research_anchor
+    intended_use:
+      - gate_timing_guardrail
+      - frequency_response_window_guardrail
+    access:
+      type: pdf
+      url: https://www.neso.energy/document/321111/download
+    research_findings:
+      - SFFR procurement used six EFA blocks.
+      - Gate opens 14 days before service day.
+      - Gate closes at 11:00 on the EFA day immediately preceding service day.
+      - Auction results time is no later than 17:00 in the cited report.
+    caveat: >
+      These timings are not universal EAC product rules. Treat as a guardrail
+      until Phase 1 verifies the selected products.
+
+  - source_id: CM_OFFICIAL_AUCTION_PARAMETERS
+    name: Official Capacity Market clearing price and derating sources
+    owner: Delivery Body or official GB Capacity Market publication source
+    status: usable_with_caveat
+    intended_use:
+      - cm_clearing_prices
+      - cm_storage_derating_factors
+      - cm_delivery_year_scenarios
+    access:
+      type: official_publication
+      url: https://www.gov.uk/government/publications/capacity-market-auction-parameters-letter-from-desnz-to-neso-february-2025/final-auction-parameters-t-1-and-t-4-capacity-market-auctions
+      auction_monitor_t4_2028_29: https://assets.publishing.service.gov.uk/media/67d44b1db1e34f07631b5bf8/t4-2024-for-delivery-2028-2029-auction-monitor-report.pdf
+    expected_fields:
+      - auction_type
+      - delivery_year
+      - clearing_price_gbp_per_kw_year
+      - storage_duration_hours
+      - derating_factor
+    caveat: >
+      Auction parameters and clearing-price publications are verified. Duration-specific
+      storage derating remains usable only as sourced scenario/reference data until a
+      selected official auction guideline workbook or equivalent machine-readable source is
+      added. Secondary research articles may remain anchors only.
+    licence: Open Government Licence v3.0 for GOV.UK pages unless otherwise stated
+    phase1_decision: usable_for_cm_scenario_reference_with_derating_caveat
+
+  - source_id: MODO_CM_DERATING_2024_25_ANCHOR
+    name: Modo Energy 2024/25 Capacity Market BESS derating article
+    owner: Modo Energy
+    status: research_anchor
+    intended_use:
+      - cm_derating_research_anchor
+      - benchmark_context
+    access:
+      type: article
+      url: https://modoenergy.com/research/en/gb-capacity-market-2025-bess-derating-factors-confirmed-target-capacity
+    source_date: 2024-08-12
+    research_values:
+      t1_2h_bess_derating: 0.2715
+      t4_2h_bess_derating: 0.2094
+    caveat: >
+      These values are article anchors for the cited auction cycle, not timeless
+      constants. Prefer official values before central runs.
+
+  - source_id: PUBLIC_BENCHMARK_ANCHORS
+    name: Public battery revenue benchmark anchors
+    owner: Multiple public publishers
+    status: usable_with_caveat
+    intended_use:
+      - benchmark_reconciliation
+      - public_context
+    access:
+      type: manual_or_programmatic
+      url: verify_per_anchor_at_reconciliation_time
+    required_metadata:
+      - url
+      - publication_date
+      - methodology_version_or_note
+      - component_scope_if_known
+      - reuse_caveat
+    caveat: >
+      Benchmarks are reconciliation anchors, not validation targets or
+      proprietary model replication goals.
+    phase1_decision: usable_only_for_cited_reconciliation_anchors
+
+  - source_id: ELEXON_BM_OBSERVED_OPTIONAL
+    name: Public Balancing Mechanism observed action data
+    owner: Elexon
+    status: optional
+    intended_use:
+      - observed_bm_appendix
+    access:
+      type: api_or_download
+      url: phase5_verify_if_scoped
+    caveat: >
+      Observed BM data may be used only for an ex-post appendix. It must not
+      create deterministic counterfactual revenue for the reference asset.
+
+  - source_id: PROJECT_CONVENTION
+    name: Project modelling convention
+    owner: Project
+    status: central_default
+    intended_use:
+      - units
+      - modelling_boundaries
+      - result_caveats
+    access:
+      type: local_docs
+      url: docs/implementation_conventions.md
+    caveat: >
+      Project conventions are not external evidence. Use external sources for
+      market facts and numerical market parameters.
