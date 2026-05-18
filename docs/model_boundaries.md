@@ -202,3 +202,20 @@ Not allowed:
 - stochastic solve;
 - live API backfill;
 - hidden data mutation.
+
+## 13. Residential and Commercial Branch Boundary
+
+Residential BESS modelling is a separate branch namespace. It uses household
+kW/kWh units, residential product presets, DNO export-limit assumptions and
+aggregator/VPP eligibility. Residential defaults must not be mixed into the
+central MW/MWh market-stack optimiser.
+
+Commercial BESS modelling is a separate branch namespace. It uses MW/MWh units
+and site export-limit assumptions. It should grow separately from residential
+modelling and from the central optimiser internals until a deliberate integration
+decision is made.
+
+Residential branch outputs must describe normal household direct market bidding
+as ineligible unless effective export capability reaches the relevant direct
+access threshold. Aggregator/VPP participation is the default market-access route
+for household systems.

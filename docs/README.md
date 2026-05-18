@@ -15,6 +15,7 @@ The governing product plan remains `../GB_BESS_Optimisation_Product_Plan.md`. Th
 - `source_research_notes.md`: compact research-anchor notes to carry into the target repo.
 - `strategic_positioning.md`: durable product edge and differentiation memory.
 - `phase_4_plan.md`: rolling EAC policy and deterministic sweep handoff plan.
+- `residential_bess_assumptions.md`: separate residential and commercial branch boundary plus household BESS defaults.
 
 ## Release docs
 

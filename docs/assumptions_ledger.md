@@ -11,6 +11,7 @@ This ledger records numerical and modelling assumptions that affect project outp
 | `central_default` | Approved for central Release 1 runs after source review. |
 | `sensitivity_only` | May be used in labelled sensitivity runs, not central result. |
 | `diagnostic_only` | Used only to expose artefacts or compare methods. |
+| `branch_default` | Default for a non-central modelling branch; not part of central Release 1 results. |
 | `excluded` | Explicitly outside Release 1. |
 
 ## Assumption Register
@@ -46,6 +47,12 @@ This ledger records numerical and modelling assumptions that affect project outp
 | A-BM-001 | Balancing Mechanism | Deterministic BM counterfactual revenue is excluded. | policy | excluded | PROJECT_CONVENTION | observed appendix only | Public data cannot infer hypothetical acceptances. |
 | A-BENCH-001 | Benchmark | Public benchmark comparison is reconciliation. | policy | central_default | PUBLIC_BENCHMARK_ANCHORS | none | Not replication or validation. |
 | A-DASH-001 | Dashboard | Dashboard reads cached artefacts only. | policy | central_default | PROJECT_CONVENTION | none | No live heavy solves or API backfill. |
+| A-RES-001 | Residential branch | Residential BESS presets use household kW/kWh units and stay separate from the central MW/MWh optimiser. | policy | branch_default | PROJECT_CONVENTION | commercial branch | Prevents household defaults from leaking into central market-stack runs. |
+| A-RES-002 | Residential branch | Integrated-inverter BESS presets exclude external inverter cost from total capex. | policy | branch_default | PROJECT_CONVENTION | external inverter sensitivity | Applies to products such as Tesla Powerwall 3, GivEnergy All-in-One 2 and Enphase IQ Battery 5P. |
+| A-RES-003 | Residential branch | Battery-only BESS presets include compatible external inverter cost in total capex. | policy | branch_default | PROJECT_CONVENTION | inverter-cost sensitivity | Applies to products such as the GivEnergy 9.5 kWh module. |
+| A-RES-004 | Residential branch | Default DNO export limit is modelled separately from inverter rating. | kW | branch_default | PROJECT_CONVENTION | configured export limit | Default branch value is 3.68 kW. |
+| A-RES-005 | Residential branch | Normal residential BESS cannot directly bid into NESO markets under default household export limits; aggregator/VPP participation is allowed. | policy | branch_default | PROJECT_CONVENTION | direct access threshold | Direct NESO threshold is modelled as 1,000 kW. |
+| A-RES-006 | Residential branch | UKPN/London direct local flexibility threshold is modelled at 10 kW effective export capability. | kW | branch_default | PROJECT_CONVENTION | configured local threshold | Below this threshold, household systems require indirect participation routes. |
 
 ## Update Rules
 
