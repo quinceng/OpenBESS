@@ -14,6 +14,7 @@ The governing product plan remains `../GB_BESS_Optimisation_Product_Plan.md`. Th
 - `data_sources.md`: human-readable source notes and Phase 1 verification instructions.
 - `source_research_notes.md`: compact research-anchor notes to carry into the target repo.
 - `strategic_positioning.md`: durable product edge and differentiation memory.
+- `phase_4_plan.md`: rolling EAC policy and deterministic sweep handoff plan.
 
 ## Release docs
 

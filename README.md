@@ -18,6 +18,7 @@ known-time metadata and reproducible tests. It is not a commercial trading syste
 - Phase 2 energy-only perfect-foresight optimiser for a single battery.
 - Phase 2.5 rolling-horizon policy wrapper with no-leakage information sets, simple forecast baselines, state carry-forward and capture-ratio reporting.
 - Phase 3 price-taking EAC availability proxy and separate Capacity Market annual scenario layer.
+- Phase 4 started with rolling wholesale + EAC policy evaluation and deterministic scalar scenario sweeps.
 
 ## Setup
 

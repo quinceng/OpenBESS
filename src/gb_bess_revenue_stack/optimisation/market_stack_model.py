@@ -64,6 +64,7 @@ def solve_market_stack(
     asset: AssetConfig,
     initial_soc_mwh: float,
     terminal_soc_policy: TerminalSocPolicy = "cyclic",
+    terminal_soc_target_mwh: float | None = None,
     solver_config: SolverConfig | None = None,
 ) -> MarketStackResult:
     """Solve an energy plus price-taking EAC availability model."""
@@ -74,6 +75,7 @@ def solve_market_stack(
             asset=asset,
             initial_soc_mwh=initial_soc_mwh,
             terminal_soc_policy=terminal_soc_policy,
+            terminal_soc_target_mwh=terminal_soc_target_mwh,
             solver_config=solver_config,
         )
 
@@ -82,6 +84,7 @@ def solve_market_stack(
         asset=asset,
         initial_soc_mwh=initial_soc_mwh,
         terminal_soc_policy=terminal_soc_policy,
+        terminal_soc_target_mwh=terminal_soc_target_mwh,
         binary_dispatch=True,
     )
     model = build_energy_dispatch_model(dispatch_input)
@@ -117,6 +120,7 @@ def _solve_energy_only_as_market_stack(
     asset: AssetConfig,
     initial_soc_mwh: float,
     terminal_soc_policy: TerminalSocPolicy,
+    terminal_soc_target_mwh: float | None,
     solver_config: SolverConfig | None,
 ) -> MarketStackResult:
     dispatch_input = build_dispatch_input(
@@ -124,6 +128,7 @@ def _solve_energy_only_as_market_stack(
         asset=asset,
         initial_soc_mwh=initial_soc_mwh,
         terminal_soc_policy=terminal_soc_policy,
+        terminal_soc_target_mwh=terminal_soc_target_mwh,
         binary_dispatch=True,
     )
     model = build_energy_dispatch_model(dispatch_input)
