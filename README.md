@@ -17,6 +17,7 @@ known-time metadata and reproducible tests. It is not a commercial trading syste
 
 - Phase 2 energy-only perfect-foresight optimiser for a single battery.
 - Phase 2.5 rolling-horizon policy wrapper with no-leakage information sets, simple forecast baselines, state carry-forward and capture-ratio reporting.
+- Phase 3 price-taking EAC availability proxy and separate Capacity Market annual scenario layer.
 
 ## Setup
 
@@ -46,4 +47,5 @@ uv run gb-bess fetch-data --source ELEXON_BMRS_MID --start 2024-01-01T00:00Z --e
 uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 uv run gb-bess run-smoke
 uv run gb-bess run-rolling-smoke
+uv run gb-bess run-market-stack-smoke
 ```

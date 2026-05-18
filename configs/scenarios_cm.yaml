@@ -1,0 +1,24 @@
+schema_version: 0.1.0
+scenarios:
+  - scenario_name: t1_2025_26_two_hour_research_anchor
+    auction_type: T-1
+    delivery_year: 2025/26
+    clearing_price_gbp_per_kw_year: 20.0
+    derating_factor: 0.2715
+    asset_duration_hours: 2.0
+    contracted_mw_nameplate: 50.0
+    source_id: MODO_CM_DERATING_2024_25_ANCHOR
+    source_url: https://modoenergy.com/research/en/gb-capacity-market-2025-bess-derating-factors-confirmed-target-capacity
+    source_date: "2024-08-12"
+    notes: Research-anchor 2h BESS derating only; not a central official derating default.
+  - scenario_name: t4_2028_29_two_hour_research_anchor
+    auction_type: T-4
+    delivery_year: 2028/29
+    clearing_price_gbp_per_kw_year: 60.0
+    derating_factor: 0.2094
+    asset_duration_hours: 2.0
+    contracted_mw_nameplate: 50.0
+    source_id: MODO_CM_DERATING_2024_25_ANCHOR
+    source_url: https://modoenergy.com/research/en/gb-capacity-market-2025-bess-derating-factors-confirmed-target-capacity
+    source_date: "2024-08-12"
+    notes: Research-anchor 2h BESS derating only; not a central official derating default.

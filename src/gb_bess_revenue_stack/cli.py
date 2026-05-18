@@ -20,7 +20,17 @@ from gb_bess_revenue_stack.data.neso import (
 )
 from gb_bess_revenue_stack.data.quality import validate_wholesale_prices
 from gb_bess_revenue_stack.data.tabular import records_to_dataframe
+from gb_bess_revenue_stack.markets.capacity_market import (
+    CMAnnualRevenue,
+    calculate_cm_annual_revenue,
+    load_cm_scenarios,
+)
+from gb_bess_revenue_stack.markets.eac_prices import EACPriceMatrix, synthetic_single_service_matrix
 from gb_bess_revenue_stack.optimisation.inputs import build_dispatch_input
+from gb_bess_revenue_stack.optimisation.market_stack_model import (
+    MarketStackResult,
+    solve_market_stack,
+)
 from gb_bess_revenue_stack.optimisation.model_factory import build_energy_dispatch_model
 from gb_bess_revenue_stack.optimisation.results import DispatchResult, extract_dispatch_result
 from gb_bess_revenue_stack.optimisation.solve import solve_dispatch_model
@@ -231,6 +241,60 @@ def run_rolling_smoke(
     )
 
 
+@app.command()
+def run_market_stack_smoke(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for the Phase 3 market-stack smoke outputs."),
+    ] = Path("results/runs/phase3_market_stack_smoke"),
+) -> None:
+    """Run a tiny network-free energy + EAC + CM smoke calculation."""
+
+    fixture_path = Path("tests/fixtures/phase2_toy_prices.csv")
+    records = _load_fixture_prices(fixture_path)
+    asset = AssetConfig(
+        name="phase3-reference-2h",
+        power_mw=1,
+        energy_capacity_mwh=2,
+        eta_charge=1,
+        eta_discharge=1,
+    )
+    eac_matrix = synthetic_single_service_matrix(
+        product_source_label="DCL",
+        product_model_label="dynamic_containment_low",
+        direction_model_label="upward",
+        price_gbp_per_mw_h=50,
+        duration_h=0.5,
+        modelling_caveat="synthetic price-taking EAC availability proxy",
+    )
+    market_stack = solve_market_stack(
+        prices=records,
+        eac_price_matrix=eac_matrix,
+        asset=asset,
+        initial_soc_mwh=1,
+        terminal_soc_policy="cyclic",
+    )
+    cm_scenarios = load_cm_scenarios(Path("configs/scenarios_cm.yaml"))
+    cm_revenue = calculate_cm_annual_revenue(
+        cm_scenarios.by_key(
+            auction_type="T-1",
+            delivery_year="2025/26",
+            asset_duration_hours=2,
+        )
+    )
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    _write_eac_price_matrix(eac_matrix, output_dir / "eac_price_matrix.json")
+    _write_market_stack_result(market_stack, output_dir / "market_stack_result.json")
+    _write_cm_annual_revenue(cm_revenue, output_dir / "cm_annual_summary.json")
+    typer.echo(
+        f"Solved market-stack smoke: total_gbp={market_stack.total_revenue_gbp:.2f}, "
+        f"energy_gbp={market_stack.energy_revenue_gbp:.2f}, "
+        f"service_gbp={market_stack.service_revenue_gbp:.2f}, "
+        f"cm_annual_gbp={cm_revenue.annual_revenue_gbp:.2f}"
+    )
+
+
 def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:
     with path.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
@@ -296,4 +360,16 @@ def _write_dispatch_result(result: DispatchResult, path: Path) -> None:
 
 
 def _write_rolling_run(result: RollingRun, path: Path) -> None:
+    path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _write_eac_price_matrix(result: EACPriceMatrix, path: Path) -> None:
+    path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _write_market_stack_result(result: MarketStackResult, path: Path) -> None:
+    path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _write_cm_annual_revenue(result: CMAnnualRevenue, path: Path) -> None:
     path.write_text(result.model_dump_json(indent=2), encoding="utf-8")

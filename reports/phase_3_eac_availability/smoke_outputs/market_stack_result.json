@@ -1,0 +1,88 @@
+{
+  "rows": [
+    {
+      "period_index": 0,
+      "charge_mw": 1.0,
+      "discharge_mw": 0.0,
+      "soc_start_mwh": 1.0,
+      "reserve_up_mw": {
+        "dynamic_containment_low": 1.0
+      },
+      "reserve_down_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "energy_revenue_gbp": -5.0,
+      "service_revenue_gbp": 25.0,
+      "total_revenue_gbp": 20.0
+    },
+    {
+      "period_index": 1,
+      "charge_mw": 1.0,
+      "discharge_mw": 0.0,
+      "soc_start_mwh": 1.5,
+      "reserve_up_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "reserve_down_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "energy_revenue_gbp": -5.0,
+      "service_revenue_gbp": 0.0,
+      "total_revenue_gbp": -5.0
+    },
+    {
+      "period_index": 2,
+      "charge_mw": 0.0,
+      "discharge_mw": 1.0,
+      "soc_start_mwh": 2.0,
+      "reserve_up_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "reserve_down_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "energy_revenue_gbp": 50.0,
+      "service_revenue_gbp": 0.0,
+      "total_revenue_gbp": 50.0
+    },
+    {
+      "period_index": 3,
+      "charge_mw": 0.0,
+      "discharge_mw": 1.0,
+      "soc_start_mwh": 1.5,
+      "reserve_up_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "reserve_down_mw": {
+        "dynamic_containment_low": 0.0
+      },
+      "energy_revenue_gbp": 50.0,
+      "service_revenue_gbp": 0.0,
+      "total_revenue_gbp": 50.0
+    }
+  ],
+  "service_components": [
+    {
+      "product_source_label": "DCL",
+      "product_model_label": "dynamic_containment_low",
+      "direction_model_label": "upward",
+      "committed_mw_average": 0.25,
+      "revenue_gbp": 25.0,
+      "modelling_caveat": "synthetic price-taking EAC availability proxy"
+    }
+  ],
+  "energy_revenue_gbp": 90.0,
+  "service_revenue_gbp": 25.0,
+  "total_revenue_gbp": 115.0,
+  "solver_objective_gbp": 115.0,
+  "solver": {
+    "solver_name": "appsi_highs",
+    "status": "ok",
+    "termination_condition": "optimal",
+    "objective_value": 115.0,
+    "wall_time_seconds": 0.01608917100020335,
+    "time_limit_seconds": 300,
+    "mip_gap": 0.001,
+    "best_bound": 115.0
+  }
+}

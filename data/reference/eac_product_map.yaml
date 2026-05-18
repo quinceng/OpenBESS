@@ -7,30 +7,70 @@ products:
   DCL:
     model_label: dynamic_containment_low
     direction_model_label: upward
+    central_active: true
+    service_duration_h: 4.0
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: constant_within_block
   DCH:
     model_label: dynamic_containment_high
     direction_model_label: downward
+    central_active: true
+    service_duration_h: 4.0
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: constant_within_block
   DML:
     model_label: dynamic_moderation_low
     direction_model_label: upward
+    central_active: true
+    service_duration_h: 4.0
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: constant_within_block
   DMH:
     model_label: dynamic_moderation_high
     direction_model_label: downward
+    central_active: true
+    service_duration_h: 4.0
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: constant_within_block
   DRL:
     model_label: dynamic_regulation_low
     direction_model_label: upward
+    central_active: true
+    service_duration_h: 4.0
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: constant_within_block
   DRH:
     model_label: dynamic_regulation_high
     direction_model_label: downward
+    central_active: true
+    service_duration_h: 4.0
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: constant_within_block
   PQR:
     model_label: positive_quick_reserve
     direction_model_label: upward
+    central_active: false
+    service_duration_h: 0.5
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: none
   NQR:
     model_label: negative_quick_reserve
     direction_model_label: downward
+    central_active: false
+    service_duration_h: 0.5
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: none
   PSR:
     model_label: positive_slow_reserve
     direction_model_label: upward
+    central_active: false
+    service_duration_h: 0.5
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: none
   NSR:
     model_label: negative_slow_reserve
     direction_model_label: downward
+    central_active: false
+    service_duration_h: 0.5
+    service_window_source_id: NESO_EAC_MARKET_RULES
+    block_commitment_rule: none
