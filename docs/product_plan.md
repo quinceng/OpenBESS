@@ -69,7 +69,19 @@ The release must be:
 - honest about benchmark divergence;
 - narrow enough to finish.
 
-## 6. MVP Release Path
+## 6. Strategic Edge
+
+The project is not a live commercial flexibility platform. Its durable edge is:
+
+- transparency;
+- explainability;
+- open/public-data methodology;
+- transparent GB BESS revenue-stack modelling for investors, analysts and public-data due diligence;
+- clean audit trail from result to source, assumption and config;
+- fast experimentation;
+- investor and analyst tooling rather than live retail flexibility control.
+
+## 7. MVP Release Path
 
 The minimum credible Release 1 is:
 
@@ -84,7 +96,7 @@ The minimum credible Release 1 is:
 
 Additional EAC products, observed BM, global sensitivity and stochastic programming are optional only after the core path is stable.
 
-## 7. Public Wording
+## 8. Public Wording
 
 Use:
 

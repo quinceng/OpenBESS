@@ -31,6 +31,8 @@ The final artefact is a polished open-source repository, cached dashboard, metho
 
 > Under transparent public-data assumptions, how much value can a reference 2-hour GB BESS capture from wholesale proxy and EAC availability revenues, how much of a perfect-foresight ceiling is achievable by a no-leakage rolling policy, and which public-data limitations explain divergence from commercial benchmark narratives?
 
+The durable edge is transparency, explainability, open/public-data methodology, transparent GB BESS revenue-stack modelling for investors, analysts and public-data due diligence, a clean audit trail, fast experimentation and investor/analyst tooling rather than live retail flexibility control.
+
 ---
 
 ## 2. What changed in this revised plan
