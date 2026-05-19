@@ -51,6 +51,21 @@ results/dashboard/data_quality.json
 results/dashboard/caveats.json
 ```
 
+Phase 4 currently writes the implemented subset needed for the cached explainer:
+
+```text
+results/dashboard/manifest.json
+results/dashboard/executive_summary.json
+results/dashboard/revenue_stack.parquet
+results/dashboard/policy_capture.parquet
+results/dashboard/scenario_sweeps.parquet
+results/dashboard/caveats.json
+```
+
+`eac_commitments.parquet`, `finance_cashflows.parquet`,
+`benchmark_reconciliation.json` and `data_quality.json` remain follow-on cache
+files for later dashboard and finance/reconciliation work.
+
 ## 4. Executive Summary Schema
 
 `executive_summary.json` should include:

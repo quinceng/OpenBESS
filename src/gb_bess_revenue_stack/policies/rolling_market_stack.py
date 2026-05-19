@@ -78,8 +78,10 @@ class RollingMarketStackScenario(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    stress_label: str = "central"
     wholesale_price_scalar: float = Field(default=1, ge=0)
     eac_price_scalar: float = Field(default=1, ge=0)
+    notes: str = ""
 
 
 class RollingMarketStackScenarioResult(BaseModel):
@@ -88,6 +90,8 @@ class RollingMarketStackScenarioResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    stress_label: str = "central"
+    period_count: int = Field(default=0, ge=0)
     wholesale_price_scalar: float
     eac_price_scalar: float
     realised_energy_revenue_gbp: float
@@ -250,6 +254,8 @@ def run_rolling_market_stack_scenarios(
         results.append(
             RollingMarketStackScenarioResult(
                 name=scenario.name,
+                stress_label=scenario.stress_label,
+                period_count=len(prices),
                 wholesale_price_scalar=scenario.wholesale_price_scalar,
                 eac_price_scalar=scenario.eac_price_scalar,
                 realised_energy_revenue_gbp=run.realised_energy_revenue_gbp,

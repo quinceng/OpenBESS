@@ -49,4 +49,5 @@ uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 uv run gb-bess run-smoke
 uv run gb-bess run-rolling-smoke
 uv run gb-bess run-market-stack-smoke
+uv run gb-bess run-phase4-smoke
 ```
