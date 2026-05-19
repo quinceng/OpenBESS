@@ -122,6 +122,26 @@ settlement adjustments or all network charge structures. Standing charge is
 reported as part of the no-battery comparator but is treated as non-controllable
 by dispatch.
 
+## Residential Scenario Sweeps
+
+The release scenario sweep evaluates named payback cases without invoking the
+commercial optimiser:
+
+- `standard_flat_tariff`: central flat-rate household proxy with modest PV
+  export and VPP value;
+- `smart_tariff_high_spread`: smart import-tariff upside with higher intra-day
+  spread capture;
+- `pv_rich_export_limited`: larger PV household constrained by the default
+  3.68 kW export limit;
+- `g100_export_uplift`: site-specific export-limit sensitivity using a 10 kW
+  allowance;
+- `low_use_no_vpp`: lower-use downside with no aggregator/VPP payment.
+
+These are public-proxy scenario assumptions for comparing branch behaviour.
+They are not tariff offers, supplier bills, DNO approvals or guaranteed VPP
+contracts. Each result preserves the residential branch label and market-access
+eligibility so it cannot be confused with the commercial MW/MWh optimiser.
+
 ## Public Reference Assumptions
 
 When actual household data is unavailable, the residential branch exposes public

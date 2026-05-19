@@ -64,3 +64,12 @@ def test_cli_exposes_run_residential_household_smoke_subcommand() -> None:
     assert "--profile-csv" in result.output
     assert "--tariff-csv" in result.output
     assert "--output-dir" in result.output
+
+
+def test_cli_exposes_run_residential_scenario_sweep_subcommand() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["run-residential-scenario-sweep", "--help"])
+
+    assert result.exit_code == 0
+    assert "--output-dir" in result.output

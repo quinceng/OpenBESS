@@ -43,6 +43,12 @@ from gb_bess_revenue_stack.residential.public_assumptions import (
     get_public_reference_household_assumptions,
     public_residential_data_sources,
 )
+from gb_bess_revenue_stack.residential.scenarios import (
+    ResidentialPaybackScenario,
+    ResidentialPaybackScenarioResult,
+    default_residential_payback_scenarios,
+    run_residential_payback_scenarios,
+)
 from gb_bess_revenue_stack.residential.vpp import (
     ResidentialVPPEvent,
     ResidentialVPPRevenue,
@@ -60,6 +66,8 @@ __all__ = [
     "ResidentialHouseholdDispatchRow",
     "ResidentialHouseholdInterval",
     "ResidentialMarketAccessResult",
+    "ResidentialPaybackScenario",
+    "ResidentialPaybackScenarioResult",
     "ResidentialPublicDataSource",
     "ResidentialPublicReferenceHouseholdAssumptions",
     "ResidentialTariffPeriod",
@@ -76,10 +84,12 @@ __all__ = [
     "calculate_residential_household_payback",
     "calculate_residential_household_payback_from_dispatch",
     "calculate_vpp_revenue",
+    "default_residential_payback_scenarios",
     "evaluate_residential_market_access",
     "get_public_reference_household_assumptions",
     "get_residential_preset",
     "public_residential_data_sources",
+    "run_residential_payback_scenarios",
     "residential_presets",
     "solve_residential_household_dispatch",
     "validate_household_intervals",

@@ -62,8 +62,10 @@ from gb_bess_revenue_stack.reporting.investor_workbook import (
 from gb_bess_revenue_stack.residential import (
     ResidentialHouseholdDispatchInput,
     ResidentialHouseholdDispatchResult,
+    ResidentialPaybackScenarioResult,
     calculate_residential_household_payback_from_dispatch,
     get_residential_preset,
+    run_residential_payback_scenarios,
     solve_residential_household_dispatch,
 )
 from gb_bess_revenue_stack.residential.io import load_household_profile_csv, load_tariff_csv
@@ -606,6 +608,47 @@ def run_residential_household_smoke(
     typer.echo(
         f"Solved residential household smoke: savings_gbp={result.total_bill_savings_gbp:.2f}"
     )
+
+
+def _best_residential_payback_result(
+    results: list[ResidentialPaybackScenarioResult],
+) -> ResidentialPaybackScenarioResult | None:
+    finite = [result for result in results if result.payback.simple_payback_years is not None]
+    if not finite:
+        return None
+    return min(
+        finite,
+        key=lambda result: (
+            result.payback.simple_payback_years
+            if result.payback.simple_payback_years is not None
+            else float("inf")
+        ),
+    )
+
+
+@app.command()
+def run_residential_scenario_sweep(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Output directory for residential scenario sweep outputs."),
+    ] = Path("results/runs/residential_scenario_sweep"),
+) -> None:
+    """Run the default residential payback scenario sweep."""
+
+    results = run_residential_payback_scenarios()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "residential_scenario_sweep.json").write_text(
+        json.dumps([result.model_dump(mode="json") for result in results], indent=2),
+        encoding="utf-8",
+    )
+    best = _best_residential_payback_result(results)
+    if best is None:
+        typer.echo(f"Solved residential scenario sweep: scenarios={len(results)}, best_payback=n/a")
+    else:
+        typer.echo(
+            "Solved residential scenario sweep: "
+            f"scenarios={len(results)}, best_payback={best.scenario_name}"
+        )
 
 
 def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:
