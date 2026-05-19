@@ -102,17 +102,21 @@ uv run gb-bess run-scenarios --config configs/scenarios_policy.yaml
 
 ## 7. Dashboard Cache
 
-Dashboard cache should be built separately:
+Dashboard cache is built by the network-free Phase 4 smoke command:
 
 ```bash
-uv run gb-bess build-dashboard-cache --config configs/dashboard_cache.yaml
+uv run gb-bess run-phase4-smoke
 ```
 
-The dashboard should then run without solver or raw data:
+The dashboard should then run from cached files without solver, raw data or live
+API calls:
 
 ```bash
 uv run streamlit run dashboard/streamlit_app.py
 ```
+
+The dashboard imports only the cache reader/UI layer during normal load. Tests
+guard against importing source clients or solver modules from the dashboard.
 
 ## 8. Expected Artefacts
 

@@ -51,7 +51,8 @@ results/dashboard/data_quality.json
 results/dashboard/caveats.json
 ```
 
-Phase 4 currently writes the implemented subset needed for the cached explainer:
+Phase 4/5 currently writes the implemented subset needed for the cached
+explainer:
 
 ```text
 results/dashboard/manifest.json
@@ -59,12 +60,15 @@ results/dashboard/executive_summary.json
 results/dashboard/revenue_stack.parquet
 results/dashboard/policy_capture.parquet
 results/dashboard/scenario_sweeps.parquet
+results/dashboard/degradation_summary.json
+results/dashboard/finance_summary.json
+results/dashboard/finance_cashflows.parquet
+results/dashboard/benchmark_reconciliation.json
 results/dashboard/caveats.json
 ```
 
-`eac_commitments.parquet`, `finance_cashflows.parquet`,
-`benchmark_reconciliation.json` and `data_quality.json` remain follow-on cache
-files for later dashboard and finance/reconciliation work.
+`eac_commitments.parquet` and `data_quality.json` remain follow-on cache files
+for later dashboard/source-quality work.
 
 ## 4. Executive Summary Schema
 

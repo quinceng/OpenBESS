@@ -479,6 +479,8 @@ def run_phase4_smoke(
                 "wholesale": "synthetic Phase 4 stress profile",
                 "eac": "synthetic EAC availability proxy",
             },
+            battery_energy_capacity_mwh=commercial.battery_capacity_mwh,
+            capex_gbp=commercial.total_capex_gbp,
         ),
         dashboard_dir,
     )

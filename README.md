@@ -18,7 +18,9 @@ known-time metadata and reproducible tests. It is not a commercial trading syste
 - Phase 2 energy-only perfect-foresight optimiser for a single battery.
 - Phase 2.5 rolling-horizon policy wrapper with no-leakage information sets, simple forecast baselines, state carry-forward and capture-ratio reporting.
 - Phase 3 price-taking EAC availability proxy and separate Capacity Market annual scenario layer.
-- Phase 4 started with rolling wholesale + EAC policy evaluation and deterministic scalar scenario sweeps.
+- Phase 4 rolling wholesale + EAC policy evaluation, capture-ratio comparison, 24h/48h smoke comparisons and deterministic scalar scenario sweeps.
+- Cached dashboard reader/UI for `results/dashboard/*` outputs.
+- Phase 5 cached degradation proxy, finance scenario appraisal and benchmark reconciliation placeholders.
 
 ## Setup
 
@@ -50,4 +52,5 @@ uv run gb-bess run-smoke
 uv run gb-bess run-rolling-smoke
 uv run gb-bess run-market-stack-smoke
 uv run gb-bess run-phase4-smoke
+uv run streamlit run dashboard/streamlit_app.py
 ```

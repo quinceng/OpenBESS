@@ -48,7 +48,7 @@ packages = ["src/gb_bess_revenue_stack"]
 [tool.pytest.ini_options]
 addopts = "-m 'not integration'"
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 markers = [
   "integration: tests that call live external services",
   "unit: network-free unit tests",

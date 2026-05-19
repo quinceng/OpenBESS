@@ -81,6 +81,7 @@ Use this checklist before publishing Release 1.
 - Dashboard runs from cached outputs.
 - Dashboard does not call live APIs.
 - Dashboard does not require solver.
+- Dashboard import guard blocks solver and source-client imports.
 - All charts have units.
 - Caveats are visible without opening methodology.
 - Missing cache files fail gracefully.
