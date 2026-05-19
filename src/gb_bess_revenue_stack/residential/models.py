@@ -105,6 +105,39 @@ class ResidentialMarketAccessResult(BaseModel):
         raise KeyError(msg)
 
 
+class ResidentialHouseholdCalculatorInputs(BaseModel):
+    """Simple household BESS annual benefit assumptions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dno_export_limit_kw: float = Field(default=3.68, gt=0)
+    annual_self_consumption_savings_gbp: float = Field(ge=0)
+    annual_tariff_arbitrage_savings_gbp: float
+    annual_export_revenue_gbp: float = 0
+    annual_aggregator_vpp_revenue_gbp: float = Field(default=0, ge=0)
+    include_aggregator_vpp: bool = True
+
+
+class ResidentialHouseholdCalculatorResult(BaseModel):
+    """Payback-style household calculator output."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    branch_name: Literal["residential"] = "residential"
+    system_name: str
+    battery_capacity_kwh: float = Field(gt=0)
+    inverter_power_kw: float = Field(gt=0)
+    export_limit_kw: float = Field(gt=0)
+    capex_gbp: float = Field(ge=0)
+    self_consumption_savings_gbp: float = Field(ge=0)
+    tariff_arbitrage_savings_gbp: float
+    export_revenue_gbp: float
+    aggregator_vpp_revenue_gbp: float = Field(ge=0)
+    total_annual_benefit_gbp: float
+    simple_payback_years: float | None = Field(default=None, ge=0)
+    market_access: ResidentialMarketAccessResult
+
+
 def evaluate_residential_market_access(
     system: ResidentialBessSystem,
     *,
@@ -172,6 +205,86 @@ def evaluate_residential_market_access(
         dno_export_limit_kw=market_assumptions.dno_export_limit_kw,
         effective_export_limit_kw=effective_export_limit_kw,
         revenue_streams=revenue_streams,
+    )
+
+
+def calculate_residential_household_payback(
+    system: ResidentialBessSystem,
+    *,
+    inputs: ResidentialHouseholdCalculatorInputs,
+) -> ResidentialHouseholdCalculatorResult:
+    """Calculate simple annual household BESS savings and payback outputs."""
+
+    market_access = evaluate_residential_market_access(
+        system,
+        assumptions=UKResidentialMarketAccessAssumptions(
+            dno_export_limit_kw=inputs.dno_export_limit_kw
+        ),
+    )
+    aggregator_revenue = (
+        inputs.annual_aggregator_vpp_revenue_gbp
+        if inputs.include_aggregator_vpp and market_access.stream("aggregator_vpp").eligible
+        else 0.0
+    )
+    total_annual_benefit = (
+        inputs.annual_self_consumption_savings_gbp
+        + inputs.annual_tariff_arbitrage_savings_gbp
+        + inputs.annual_export_revenue_gbp
+        + aggregator_revenue
+    )
+    simple_payback_years = (
+        system.total_capex_gbp / total_annual_benefit if total_annual_benefit > 0 else None
+    )
+    return ResidentialHouseholdCalculatorResult(
+        system_name=system.name,
+        battery_capacity_kwh=system.battery_capacity_kwh,
+        inverter_power_kw=system.inverter_power_kw,
+        export_limit_kw=market_access.effective_export_limit_kw,
+        capex_gbp=system.total_capex_gbp,
+        self_consumption_savings_gbp=inputs.annual_self_consumption_savings_gbp,
+        tariff_arbitrage_savings_gbp=inputs.annual_tariff_arbitrage_savings_gbp,
+        export_revenue_gbp=inputs.annual_export_revenue_gbp,
+        aggregator_vpp_revenue_gbp=aggregator_revenue,
+        total_annual_benefit_gbp=total_annual_benefit,
+        simple_payback_years=simple_payback_years,
+        market_access=market_access,
+    )
+
+
+def calculate_residential_household_payback_from_dispatch(
+    system: ResidentialBessSystem,
+    *,
+    dispatch: object,
+    sample_hours: float,
+    dno_export_limit_kw: float,
+) -> ResidentialHouseholdCalculatorResult:
+    """Annualise a bill-aware residential dispatch result into payback outputs."""
+
+    from gb_bess_revenue_stack.residential.dispatch import ResidentialHouseholdDispatchResult
+
+    if sample_hours <= 0:
+        msg = "sample_hours must be positive."
+        raise ValueError(msg)
+    validated_dispatch = ResidentialHouseholdDispatchResult.model_validate(dispatch)
+    annualisation_factor = 8760 / sample_hours
+    vpp_revenue = (
+        0.0
+        if validated_dispatch.vpp_revenue is None
+        else validated_dispatch.vpp_revenue.total_vpp_revenue_gbp
+    )
+    return calculate_residential_household_payback(
+        system,
+        inputs=ResidentialHouseholdCalculatorInputs(
+            dno_export_limit_kw=dno_export_limit_kw,
+            annual_self_consumption_savings_gbp=validated_dispatch.self_consumption_savings_gbp
+            * annualisation_factor,
+            annual_tariff_arbitrage_savings_gbp=validated_dispatch.tariff_arbitrage_savings_gbp
+            * annualisation_factor,
+            annual_export_revenue_gbp=validated_dispatch.export_revenue_delta_gbp
+            * annualisation_factor,
+            annual_aggregator_vpp_revenue_gbp=vpp_revenue * annualisation_factor,
+            include_aggregator_vpp=True,
+        ),
     )
 
 

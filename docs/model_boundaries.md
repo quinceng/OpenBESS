@@ -219,3 +219,10 @@ Residential branch outputs must describe normal household direct market bidding
 as ineligible unless effective export capability reaches the relevant direct
 access threshold. Aggregator/VPP participation is the default market-access route
 for household systems.
+
+Residential bill-aware dispatch is a household calculator. It may model
+interval load, PV generation, retail import/export tariffs, DNO export limits and
+aggregator/VPP event payments, but it must not be presented as a supplier bill
+replica or a direct-market bidding model. It excludes supplier-specific bill
+reconstruction, VAT treatment, network-charge detail and bankability conclusions
+unless those assumptions are added explicitly.

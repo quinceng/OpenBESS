@@ -115,3 +115,36 @@ Implication:
 
 - annualisation methods must be labelled;
 - partial samples should not be overgeneralised.
+
+## 13. Residential Calculator Limitations
+
+The residential calculator is a household decision aid, not a supplier billing
+engine or contract recommendation.
+
+Implication:
+
+- first-release bill-aware dispatch does not apply an explicit degradation cost
+  to cycling;
+- VAT, supplier-specific adjustments, network charge structures and detailed
+  settlement reconstruction are excluded;
+- aggregator/VPP participation is scenario-based and does not guarantee a real
+  contract, dispatch call or event payment;
+- household load and PV inputs are only as reliable as the source data supplied
+  with the scenario.
+
+## 14. Public Residential Reference Data
+
+Public residential assumptions are reproducible proxies, not private household
+telemetry.
+
+Implication:
+
+- London and Great Britain load defaults are annual averages, not actual
+  half-hourly household behaviour;
+- the flat generated reference load profile is a fallback only and should be
+  replaced by London Datastore, UKPN/SSEN aggregate shapes, Elexon profile
+  coefficients or customer smart-meter data for serious scenario work;
+- Ofgem and Octopus public tariffs can change, so tariff assumptions need source
+  dates and reruns;
+- PVGIS output depends on roof, location and system assumptions that must be
+  recorded with each run.

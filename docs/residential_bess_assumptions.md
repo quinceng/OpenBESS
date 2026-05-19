@@ -63,6 +63,98 @@ Revenue-route treatment:
 These are modelling assumptions for branch development, not legal advice or
 market-registration guidance.
 
+## Household Calculator
+
+The residential calculator is a simple annual payback view. It does not invoke
+the main optimiser and does not mix household kW/kWh assumptions into the
+commercial MW/MWh branch.
+
+Inputs:
+
+- battery cost, installation cost and inverter cost from the selected household
+  system preset or user-defined system;
+- DNO export limit;
+- annual self-consumption savings;
+- annual tariff-arbitrage savings;
+- annual export revenue;
+- annual aggregator/VPP participation revenue, included only when enabled and
+  the aggregator route is eligible.
+
+Outputs:
+
+- battery capacity, inverter power and effective export limit;
+- total capex;
+- annual benefit split by self-consumption, tariff arbitrage, export and
+  aggregator/VPP participation;
+- total annual benefit;
+- simple payback years, blank when annual benefit is zero.
+
+## Bill-Aware Household Dispatch
+
+The residential branch also supports an interval household calculator for load,
+PV, retail import/export tariffs and optional aggregator/VPP events. This path
+uses kW/kWh household units and remains separate from the commercial branch and
+the central wholesale/EAC optimiser.
+
+Interval inputs:
+
+- household load in kWh per interval;
+- PV generation in kWh per interval;
+- import and export tariff rates in GBP/kWh;
+- optional daily standing charge in GBP/day;
+- DNO/site export limit in kW;
+- battery capacity, power, round-trip efficiency and initial state of charge;
+- optional VPP events with required export energy, minimum SoC and event
+  payment assumptions.
+
+Dispatch outputs:
+
+- readable interval timestamps;
+- grid import, export, PV self-consumption, battery charge/discharge and SoC;
+- no-battery bill and battery bill;
+- self-consumption, tariff-arbitrage, export and VPP value components;
+- annualised payback-style outputs when the sample period is shorter than a
+  year.
+
+The bill-aware calculator is a household decision aid, not a supplier billing
+replica. It does not reconstruct VAT, standing-charge variants, supplier-specific
+settlement adjustments or all network charge structures. Standing charge is
+reported as part of the no-battery comparator but is treated as non-controllable
+by dispatch.
+
+## Public Reference Assumptions
+
+When actual household data is unavailable, the residential branch exposes public
+reference assumptions through
+`gb_bess_revenue_stack.residential.public_assumptions`.
+
+The default London reference household uses public 2024 DESNZ domestic
+electricity aggregates:
+
+- annual mean domestic consumption per meter: 3,240.671 kWh;
+- annual median domestic consumption per meter: 2,357.400 kWh;
+- annual mean domestic consumption per household: 3,302.319 kWh.
+
+The Great Britain reference household uses:
+
+- annual mean domestic consumption per meter: 3,322.736 kWh;
+- annual median domestic consumption per meter: 2,471.100 kWh;
+- annual mean domestic consumption per household: 3,463.408 kWh.
+
+Default public tariff assumptions are:
+
+- import unit rate: GBP 0.2467/kWh;
+- standing charge: GBP 0.5721/day;
+- export unit rate: GBP 0.12/kWh;
+- SEG export sensitivity: GBP 0.041/kWh.
+
+These are public proxy values, not actual customer tariffs. VPP values are low,
+central and high scenarios of GBP 12, GBP 36 and GBP 60 per year respectively.
+The export-limit default remains 3.68 kW unless site-specific DNO paperwork is
+available.
+
+See `docs/residential_public_data_sources.md` for source anchors and caveats.
+
 ## Specification Anchors
 
 - Tesla Powerwall 3: https://www.tesla.com/en_GB/powerwall
