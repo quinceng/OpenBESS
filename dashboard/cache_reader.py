@@ -23,6 +23,8 @@ OPTIONAL_FILES = {
     "finance_summary": "finance_summary.json",
     "finance_cashflows": "finance_cashflows.parquet",
     "benchmark_reconciliation": "benchmark_reconciliation.json",
+    "eac_commitments": "eac_commitments.parquet",
+    "data_quality": "data_quality.json",
 }
 
 
@@ -45,6 +47,8 @@ class DashboardCache:
     finance_summary: dict[str, Any] | None = None
     finance_cashflows: pd.DataFrame | None = None
     benchmark_reconciliation: dict[str, Any] | None = None
+    eac_commitments: pd.DataFrame | None = None
+    data_quality: dict[str, Any] | None = None
 
 
 def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> DashboardCache:
@@ -74,6 +78,8 @@ def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Dashboard
             benchmark_reconciliation=_read_optional_json(
                 root / OPTIONAL_FILES["benchmark_reconciliation"]
             ),
+            eac_commitments=_read_optional_parquet(root / OPTIONAL_FILES["eac_commitments"]),
+            data_quality=_read_optional_json(root / OPTIONAL_FILES["data_quality"]),
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         msg = f"Dashboard cache at {root} could not be read: {exc}"

@@ -36,11 +36,12 @@ from gb_bess_revenue_stack.optimisation.model_factory import build_energy_dispat
 from gb_bess_revenue_stack.optimisation.results import DispatchResult, extract_dispatch_result
 from gb_bess_revenue_stack.optimisation.solve import solve_dispatch_model
 from gb_bess_revenue_stack.phase4.scenarios import (
-    build_realistic_stress_price_profile,
     default_phase4_market_stack_scenarios,
+    load_phase4_historical_sample,
     run_phase4_market_stack_capture_comparison,
     run_phase4_market_stack_sweep,
     run_phase4_smoke_window_comparisons,
+    skipped_phase4_smoke_windows,
 )
 from gb_bess_revenue_stack.policies.evaluation import evaluate_rolling_policy
 from gb_bess_revenue_stack.policies.forecasts import OracleForecast, PreviousDaySamePeriodForecast
@@ -51,6 +52,7 @@ from gb_bess_revenue_stack.policies.rolling_market_stack import (
 )
 from gb_bess_revenue_stack.reporting.dashboard_cache import (
     Phase4DashboardCacheInput,
+    load_phase4_finance_assumptions,
     write_phase4_dashboard_cache,
 )
 from gb_bess_revenue_stack.reporting.investor_workbook import (
@@ -333,17 +335,28 @@ def run_phase4_smoke(
         Path,
         typer.Option(help="Directory for dashboard-ready cached Phase 4 outputs."),
     ] = Path("results/dashboard"),
-    day_count: Annotated[
-        int,
-        typer.Option(help="Synthetic stress-profile day count."),
-    ] = 7,
+    elexon_mid_fixture: Annotated[
+        Path | None,
+        typer.Option(help="Override Elexon MID JSON fixture for the aligned historical sample."),
+    ] = None,
+    neso_eac_fixture: Annotated[
+        Path | None,
+        typer.Option(help="Override NESO EAC JSON fixture for the aligned historical sample."),
+    ] = None,
+    finance_assumptions_yaml: Annotated[
+        Path | None,
+        typer.Option(help="Optional YAML file overriding Phase 5 finance assumptions."),
+    ] = None,
 ) -> None:
-    """Run a network-free Phase 4 commercial rolling revenue-stack smoke scenario."""
+    """Run a network-free Phase 4 commercial smoke scenario from historical fixtures."""
 
-    prices = build_realistic_stress_price_profile(
-        start_utc=datetime(2024, 1, 1, tzinfo=UTC),
-        day_count=day_count,
+    finance_assumptions = load_phase4_finance_assumptions(finance_assumptions_yaml)
+    sample = load_phase4_historical_sample(
+        elexon_mid_path=elexon_mid_fixture,
+        neso_eac_path=neso_eac_fixture,
     )
+    prices = sample.prices
+    eac_matrix = sample.eac_price_matrix
     commercial = CommercialBessSystem(
         name="phase4-commercial-reference",
         battery_capacity_mwh=10,
@@ -361,23 +374,10 @@ def run_phase4_smoke(
         eta_charge=1,
         eta_discharge=1,
     )
-    eac_matrix = synthetic_single_service_matrix(
-        product_source_label="DCL",
-        product_model_label="dynamic_containment_low",
-        direction_model_label="upward",
-        price_gbp_per_mw_h=42,
-        duration_h=0.5,
-        modelling_caveat="synthetic Phase 4 price-taking EAC availability proxy",
-    )
-    eac_matrix = EACPriceMatrix(
-        cells=[
-            eac_matrix.cells[0].model_copy(update={"period_index": index})
-            for index in range(len(prices))
-        ]
-    )
+    horizon_periods = min(4, len(prices))
     rolling_config = RollingConfig(
-        horizon_periods=48,
-        step_periods=24,
+        horizon_periods=horizon_periods,
+        step_periods=1,
         terminal_soc_policy="target",
         terminal_soc_target_mwh=5,
     )
@@ -408,6 +408,29 @@ def run_phase4_smoke(
         config=rolling_config,
         window_day_counts=[1, 2],
     )
+    skipped_smoke_windows = skipped_phase4_smoke_windows(
+        prices=prices,
+        window_day_counts=[1, 2],
+    )
+    skipped_smoke_window_caveats = [
+        (
+            f"{skip.label} smoke comparison skipped: requires "
+            f"{skip.required_period_count} periods, historical sample contains "
+            f"{skip.available_period_count}."
+        )
+        for skip in skipped_smoke_windows
+    ]
+    short_sample_policy_caveat = (
+        "The default Phase 4 historical smoke fixture is 2.5h; it validates source "
+        "alignment and EAC known-at exclusion, not 24h wholesale forecast-policy performance."
+    )
+    phase4_caveats = [
+        *sample.caveats,
+        short_sample_policy_caveat,
+        *skipped_smoke_window_caveats,
+        "EAC revenue is a price-taking availability proxy.",
+        "Capacity Market and Balancing Mechanism value are not included.",
+    ]
     sweep = run_phase4_market_stack_sweep(
         prices=prices,
         eac_price_matrix=eac_matrix,
@@ -415,8 +438,8 @@ def run_phase4_smoke(
         initial_soc_mwh=5,
         forecast_model=OracleForecast(),
         config=RollingConfig(
-            horizon_periods=48,
-            step_periods=48,
+            horizon_periods=horizon_periods,
+            step_periods=1,
             terminal_soc_policy="target",
             terminal_soc_target_mwh=5,
         ),
@@ -424,7 +447,7 @@ def run_phase4_smoke(
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    _write_price_points(prices, output_dir / "stress_prices.csv")
+    _write_price_points(prices, output_dir / "historical_prices.csv")
     _write_rolling_market_stack_run(rolling_run, output_dir / "rolling_market_stack_run.json")
     (output_dir / "policy_capture.json").write_text(
         capture.model_dump_json(indent=2),
@@ -432,7 +455,14 @@ def run_phase4_smoke(
     )
     (output_dir / "smoke_window_comparisons.json").write_text(
         json.dumps(
-            [comparison.model_dump(mode="json") for comparison in smoke_window_comparisons],
+            {
+                "comparisons": [
+                    comparison.model_dump(mode="json") for comparison in smoke_window_comparisons
+                ],
+                "skipped_windows": [
+                    skipped.model_dump(mode="json") for skipped in skipped_smoke_windows
+                ],
+            },
             indent=2,
         ),
         encoding="utf-8",
@@ -447,14 +477,17 @@ def run_phase4_smoke(
             rolling_run=rolling_run,
             scenario_results=sweep.scenario_results,
             assumptions={
-                "stress_day_count": day_count,
-                "wholesale_source": "synthetic Phase 4 stress profile",
-                "eac_source": "synthetic EAC availability proxy",
+                "historical_sample_label": sample.label,
+                "sample_hours": sample.sample_hours,
+                "wholesale_source": sample.source_labels["wholesale"],
+                "eac_source": sample.source_labels["eac"],
+                "rolling_policy_horizon_periods": rolling_config.horizon_periods,
+                "rolling_policy_step_periods": rolling_config.step_periods,
+                "smoke_window_skipped_count": len(skipped_smoke_windows),
             },
             caveats=[
-                "Synthetic stress profile; not a bankability forecast.",
-                "EAC revenue is a price-taking availability proxy.",
-                "Capacity Market and Balancing Mechanism value are not included in this workbook.",
+                *phase4_caveats,
+                "Workbook values are release smoke outputs, not investment advice.",
             ],
         ),
         output_dir / "gb_bess_investor_phase4_workbook.xlsx",
@@ -466,28 +499,25 @@ def run_phase4_smoke(
             central_capture=capture,
             smoke_comparisons=smoke_window_comparisons,
             scenario_results=sweep.scenario_results,
-            caveats=[
-                "Synthetic stress profile; not a bankability forecast.",
-                "EAC revenue is a price-taking availability proxy.",
-                "Capacity Market and Balancing Mechanism value are not included.",
-            ],
-            config_hash="phase4-smoke-synthetic-config",
-            source_snapshot_hash="phase4-smoke-synthetic-source",
+            caveats=phase4_caveats,
+            config_hash="phase4-smoke-historical-fixture-config",
+            source_snapshot_hash=sample.source_snapshot_hash,
             input_run_ids=["phase4_revenue_stack_smoke"],
-            source_ids=["PROJECT_CONVENTION"],
-            source_labels={
-                "wholesale": "synthetic Phase 4 stress profile",
-                "eac": "synthetic EAC availability proxy",
-            },
+            source_ids=sample.source_ids,
+            source_labels=sample.source_labels,
+            known_at_policy="historical_fixture_source_known_at_policy",
             battery_energy_capacity_mwh=commercial.battery_capacity_mwh,
+            battery_power_mw=commercial.effective_export_limit_mw,
             capex_gbp=commercial.total_capex_gbp,
+            finance_assumptions=finance_assumptions,
         ),
         dashboard_dir,
     )
     (output_dir / "summary.json").write_text(
         json.dumps(
             {
-                "day_count": day_count,
+                "historical_sample_label": sample.label,
+                "sample_hours": sample.sample_hours,
                 "period_count": len(prices),
                 "battery_size_mwh": commercial.battery_capacity_mwh,
                 "power_rating_mw": commercial.inverter_power_mw,
@@ -498,13 +528,19 @@ def run_phase4_smoke(
                 "capture_ratio": capture.capture_ratio,
                 "dashboard_cache_dir": str(dashboard_dir),
                 "scenario_count": len(sweep.scenario_results),
+                "rolling_policy_horizon_periods": rolling_config.horizon_periods,
+                "rolling_policy_step_periods": rolling_config.step_periods,
+                "smoke_window_comparison_count": len(smoke_window_comparisons),
+                "smoke_window_skipped_windows": [
+                    skipped.model_dump(mode="json") for skipped in skipped_smoke_windows
+                ],
             },
             indent=2,
         ),
         encoding="utf-8",
     )
     typer.echo(
-        f"Solved Phase 4 smoke: days={day_count}, periods={len(prices)}, "
+        f"Solved Phase 4 historical smoke: periods={len(prices)}, "
         f"rolling_total_gbp={rolling_run.realised_total_revenue_gbp:.2f}, "
         f"workbook={output_dir / 'gb_bess_investor_phase4_workbook.xlsx'}"
     )

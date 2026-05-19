@@ -38,6 +38,8 @@ def build_view_model(cache: DashboardCache) -> dict[str, Any]:
         "has_phase5": cache.finance_summary is not None
         or cache.degradation_summary is not None
         or cache.benchmark_reconciliation is not None,
+        "has_eac_commitments": cache.eac_commitments is not None,
+        "has_data_quality": cache.data_quality is not None,
     }
 
 
@@ -62,6 +64,7 @@ def render_dashboard(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> None:
     _render_revenue_stack(st, cache)
     _render_scenarios(st, cache)
     _render_phase5(st, cache)
+    _render_data_quality(st, cache)
     _render_sources_and_caveats(st, model)
 
 
@@ -150,6 +153,16 @@ def _render_phase5(st: Any, cache: DashboardCache) -> None:
         st.dataframe(cache.finance_cashflows, hide_index=True, use_container_width=True)
     if cache.benchmark_reconciliation is not None:
         st.json(cache.benchmark_reconciliation)
+
+
+def _render_data_quality(st: Any, cache: DashboardCache) -> None:
+    if cache.eac_commitments is None and cache.data_quality is None:
+        return
+    st.subheader("EAC Commitments and Data Quality")
+    if cache.eac_commitments is not None:
+        st.dataframe(cache.eac_commitments, hide_index=True, use_container_width=True)
+    if cache.data_quality is not None:
+        st.json(cache.data_quality)
 
 
 def _render_sources_and_caveats(st: Any, model: dict[str, Any]) -> None:

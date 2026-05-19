@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from gb_bess_revenue_stack.phase4.scenarios import (
@@ -17,6 +18,92 @@ from gb_bess_revenue_stack.policies.rolling_market_stack import (
     RollingMarketStackScenarioResult,
 )
 from gb_bess_revenue_stack.schemas.base import ensure_aware_utc
+
+
+class PublicBenchmarkAnchor(BaseModel):
+    """Public benchmark row used for reconciliation context, not calibration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    benchmark_label: str
+    source_id: str = "PUBLIC_BENCHMARK_ANCHORS"
+    source_url: str
+    publication_date: date | None = None
+    access_date: date = date(2026, 5, 19)
+    methodology_status: str
+    component_scope: str
+    benchmark_value_gbp_per_mw_year: float | None = Field(default=None, ge=0)
+    caveat_labels: list[str] = Field(
+        default_factory=lambda: ["benchmark_reconciliation_not_replication"]
+    )
+
+
+def default_public_benchmark_anchors() -> list[PublicBenchmarkAnchor]:
+    """Return sourced public benchmark anchors used by the Release 1 cache."""
+
+    return [
+        PublicBenchmarkAnchor(
+            benchmark_label="Modo GB BESS 2024 average",
+            source_url=(
+                "https://modoenergy.com/research/"
+                "battery-revenues-operational-strategy-2024-gb-benchmark-year-review/"
+            ),
+            publication_date=date(2025, 2, 18),
+            access_date=date(2026, 5, 19),
+            methodology_status="public_summary_with_methodology_reference",
+            component_scope="GB BESS average revenues in 2024, public article summary",
+            benchmark_value_gbp_per_mw_year=50_000,
+            caveat_labels=[
+                "benchmark_reconciliation_not_replication",
+                "public_summary_value",
+            ],
+        ),
+        PublicBenchmarkAnchor(
+            benchmark_label="Modo GB BESS Index April 2024 including Capacity Market",
+            source_url=(
+                "https://modoenergy.com/research/"
+                "gb-benchmark-index-battery-energy-storage-april-2024-revenue"
+            ),
+            publication_date=date(2024, 5, 3),
+            access_date=date(2026, 5, 19),
+            methodology_status="public_summary_with_modo_gb_index_methodology",
+            component_scope="April 2024 annualised GB BESS Index including Capacity Market",
+            benchmark_value_gbp_per_mw_year=54_000,
+            caveat_labels=[
+                "benchmark_reconciliation_not_replication",
+                "includes_capacity_market",
+                "public_summary_value",
+            ],
+        ),
+    ]
+
+
+class Phase4FinanceAssumptions(BaseModel):
+    """Configurable Phase 5 finance and benchmark assumptions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    finance_years: int = Field(default=15, ge=1)
+    discount_rate: float = Field(default=0.08, ge=0)
+    annual_revenue_decay_rate: float = Field(default=0.02, ge=0, le=1)
+    degradation_cost_gbp_per_mwh_throughput: float = Field(default=2.0, ge=0)
+    benchmark_anchors: list[PublicBenchmarkAnchor] = Field(
+        default_factory=default_public_benchmark_anchors
+    )
+
+
+def load_phase4_finance_assumptions(path: str | Path | None = None) -> Phase4FinanceAssumptions:
+    """Load Phase 5 finance assumptions from YAML, or return Release 1 defaults."""
+
+    if path is None:
+        return Phase4FinanceAssumptions()
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    if raw is None:
+        return Phase4FinanceAssumptions()
+    if not isinstance(raw, dict):
+        msg = "Finance assumptions YAML must contain a mapping."
+        raise ValueError(msg)
+    return Phase4FinanceAssumptions.model_validate(raw)
 
 
 class Phase4DashboardCacheInput(BaseModel):
@@ -56,11 +143,9 @@ class Phase4DashboardCacheInput(BaseModel):
     central_or_sensitivity: str = "central_and_sensitivity"
     refresh_cadence: str = "manual rebuild before public release"
     battery_energy_capacity_mwh: float | None = Field(default=None, gt=0)
+    battery_power_mw: float | None = Field(default=None, gt=0)
     capex_gbp: float | None = Field(default=None, ge=0)
-    finance_years: int = Field(default=15, ge=1)
-    discount_rate: float = Field(default=0.08, ge=0)
-    annual_revenue_decay_rate: float = Field(default=0.02, ge=0, le=1)
-    degradation_cost_gbp_per_mwh_throughput: float = Field(default=2.0, ge=0)
+    finance_assumptions: Phase4FinanceAssumptions = Field(default_factory=Phase4FinanceAssumptions)
 
     @field_validator("created_at_utc")
     @classmethod
@@ -87,6 +172,8 @@ def write_phase4_dashboard_cache(
         "finance_summary": cache_dir / "finance_summary.json",
         "finance_cashflows": cache_dir / "finance_cashflows.parquet",
         "benchmark_reconciliation": cache_dir / "benchmark_reconciliation.json",
+        "eac_commitments": cache_dir / "eac_commitments.parquet",
+        "data_quality": cache_dir / "data_quality.json",
     }
     degradation = _degradation_summary(payload)
     finance_summary, finance_cashflows = _finance_outputs(payload, degradation)
@@ -111,6 +198,18 @@ def write_phase4_dashboard_cache(
     _write_json(paths["finance_summary"], finance_summary)
     pd.DataFrame(finance_cashflows).to_parquet(paths["finance_cashflows"], index=False)
     _write_json(paths["benchmark_reconciliation"], benchmark)
+    pd.DataFrame(
+        _eac_commitment_rows(payload),
+        columns=[
+            "step_index",
+            "decision_time_utc",
+            "service_model_label",
+            "direction",
+            "committed_mw",
+            "executed_period_count",
+        ],
+    ).to_parquet(paths["eac_commitments"], index=False)
+    _write_json(paths["data_quality"], _data_quality(payload))
     return paths
 
 
@@ -124,6 +223,7 @@ def _manifest(payload: Phase4DashboardCacheInput, paths: dict[str, Path]) -> dic
         "source_snapshot_hash": payload.source_snapshot_hash,
         "input_run_ids": payload.input_run_ids,
         "source_ids": payload.source_ids,
+        "source_labels": payload.source_labels,
         "licence_caveat_flags": payload.licence_caveat_flags,
         "known_at_policy": payload.known_at_policy,
         "degradation_treatment": payload.degradation_treatment,
@@ -264,9 +364,10 @@ def _degradation_summary(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
         "throughput_mwh": throughput_mwh,
         "battery_energy_capacity_mwh": capacity,
         "equivalent_full_cycles": equivalent_full_cycles,
-        "degradation_cost_gbp": throughput_mwh * payload.degradation_cost_gbp_per_mwh_throughput,
+        "degradation_cost_gbp": throughput_mwh
+        * payload.finance_assumptions.degradation_cost_gbp_per_mwh_throughput,
         "degradation_cost_gbp_per_mwh_throughput": (
-            payload.degradation_cost_gbp_per_mwh_throughput
+            payload.finance_assumptions.degradation_cost_gbp_per_mwh_throughput
         ),
         "caveat": (
             "Throughput proxy only; no electrochemical, warranty-specific or "
@@ -279,6 +380,7 @@ def _finance_outputs(
     payload: Phase4DashboardCacheInput,
     degradation: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    assumptions = payload.finance_assumptions
     annualisation_factor = (
         8760 / payload.central_capture.sample_hours
         if payload.central_capture.sample_hours > 0
@@ -300,11 +402,11 @@ def _finance_outputs(
             "cumulative_cashflow_gbp": cumulative,
         }
     )
-    for year in range(1, payload.finance_years + 1):
-        gross = annual_revenue * (1 - payload.annual_revenue_decay_rate) ** (year - 1)
+    for year in range(1, assumptions.finance_years + 1):
+        gross = annual_revenue * (1 - assumptions.annual_revenue_decay_rate) ** (year - 1)
         net = gross - annual_degradation_cost
         cumulative += net
-        discount_factor = 1 / (1 + payload.discount_rate) ** year
+        discount_factor = 1 / (1 + assumptions.discount_rate) ** year
         rows.append(
             {
                 "year": year,
@@ -333,9 +435,13 @@ def _finance_outputs(
             "annualised_degradation_cost_gbp": annual_degradation_cost,
             "npv_gbp": npv,
             "simple_payback_year": payback_year,
-            "finance_years": payload.finance_years,
-            "discount_rate": payload.discount_rate,
-            "annual_revenue_decay_rate": payload.annual_revenue_decay_rate,
+            "finance_years": assumptions.finance_years,
+            "discount_rate": assumptions.discount_rate,
+            "annual_revenue_decay_rate": assumptions.annual_revenue_decay_rate,
+            "finance_assumptions": assumptions.model_dump(
+                mode="json",
+                exclude={"benchmark_anchors"},
+            ),
             "annualisation_caveat": "Partial sample annualised from cached Phase 4 run.",
         },
         rows,
@@ -346,23 +452,90 @@ def _benchmark_reconciliation(
     payload: Phase4DashboardCacheInput,
     finance_summary: dict[str, Any],
 ) -> dict[str, Any]:
+    model_value = finance_summary["annualised_rolling_revenue_gbp"]
+    model_per_mw = model_value / payload.battery_power_mw if payload.battery_power_mw else None
     return {
         "reconciliation_scope": "benchmark reconciliation, not replication",
-        "model_annualised_rolling_revenue_gbp": finance_summary["annualised_rolling_revenue_gbp"],
+        "model_annualised_rolling_revenue_gbp": model_value,
+        "model_annualised_rolling_revenue_gbp_per_mw": model_per_mw,
         "rows": [
-            {
-                "benchmark_label": "public benchmark anchor placeholder",
-                "benchmark_value_gbp": None,
-                "model_value_gbp": finance_summary["annualised_rolling_revenue_gbp"],
-                "delta_gbp": None,
-                "methodology_status": "unknown_public_anchor_placeholder",
-                "caveat_labels": [
-                    "benchmark_reconciliation_not_replication",
-                    "partial_sample_annualised",
-                    *payload.licence_caveat_flags,
-                ],
-            }
+            _benchmark_row(anchor, model_per_mw, payload.licence_caveat_flags)
+            for anchor in payload.finance_assumptions.benchmark_anchors
         ],
+    }
+
+
+def _benchmark_row(
+    anchor: PublicBenchmarkAnchor,
+    model_per_mw: float | None,
+    licence_caveat_flags: list[str],
+) -> dict[str, Any]:
+    benchmark_value = anchor.benchmark_value_gbp_per_mw_year
+    delta = (
+        None if benchmark_value is None or model_per_mw is None else model_per_mw - benchmark_value
+    )
+    return {
+        "benchmark_label": anchor.benchmark_label,
+        "source_id": anchor.source_id,
+        "source_url": anchor.source_url,
+        "publication_date": anchor.publication_date.isoformat()
+        if anchor.publication_date is not None
+        else None,
+        "access_date": anchor.access_date.isoformat(),
+        "methodology_status": anchor.methodology_status,
+        "component_scope": anchor.component_scope,
+        "benchmark_value_gbp_per_mw_year": benchmark_value,
+        "model_value_gbp_per_mw_year": model_per_mw,
+        "delta_gbp_per_mw_year": delta,
+        "caveat_labels": sorted(
+            {
+                *anchor.caveat_labels,
+                "benchmark_reconciliation_not_replication",
+                "partial_sample_annualised",
+                *licence_caveat_flags,
+            }
+        ),
+    }
+
+
+def _eac_commitment_rows(payload: Phase4DashboardCacheInput) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for index, step in enumerate(payload.rolling_run.steps):
+        for direction, commitments in (
+            ("up", step.executed_reserve_up_mw),
+            ("down", step.executed_reserve_down_mw),
+        ):
+            for service_model_label, committed_mw in commitments.items():
+                rows.append(
+                    {
+                        "step_index": index,
+                        "decision_time_utc": step.decision_time_utc.isoformat(),
+                        "service_model_label": service_model_label,
+                        "direction": direction,
+                        "committed_mw": committed_mw,
+                        "executed_period_count": step.executed_period_count,
+                    }
+                )
+    return rows
+
+
+def _data_quality(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
+    return {
+        "run_id": payload.run_id,
+        "source_ids": payload.source_ids,
+        "source_snapshot_hash": payload.source_snapshot_hash,
+        "known_at_policy": payload.known_at_policy,
+        "licence_caveat_flags": payload.licence_caveat_flags,
+        "price_period_count": payload.central_capture.price_period_count,
+        "solver_failure_count": payload.rolling_run.solver_failure_count,
+        "excluded_future_row_count": sum(
+            step.excluded_future_row_count for step in payload.rolling_run.steps
+        ),
+        "service_cell_count": sum(step.service_cell_count for step in payload.rolling_run.steps),
+        "excluded_service_cell_count": sum(
+            step.excluded_service_cell_count for step in payload.rolling_run.steps
+        ),
+        "caveat_count": len(payload.caveats),
     }
 
 

@@ -1,11 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import hashlib
+import json
+from datetime import UTC, datetime, timedelta
+from importlib.resources import files
+from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from gb_bess_revenue_stack.config.models import AssetConfig, SolverConfig
-from gb_bess_revenue_stack.markets.eac_prices import EACPriceMatrix
+from gb_bess_revenue_stack.data.elexon import (
+    ELEXON_BASE_URL,
+    MARKET_INDEX_PATH,
+    parse_market_index_points,
+)
+from gb_bess_revenue_stack.data.neso import (
+    EAC_RESULTS_SUMMARY_RESOURCE_ID,
+    NESO_CKAN_ACTION_BASE_URL,
+    parse_eac_summary_records,
+)
+from gb_bess_revenue_stack.markets.eac_prices import EACPriceMatrix, build_eac_price_matrix
 from gb_bess_revenue_stack.optimisation.inputs import TerminalSocPolicy
 from gb_bess_revenue_stack.optimisation.market_stack_model import solve_market_stack
 from gb_bess_revenue_stack.policies.forecasts import ForecastModel
@@ -17,8 +32,25 @@ from gb_bess_revenue_stack.policies.rolling_market_stack import (
     run_rolling_market_stack_policy,
     run_rolling_market_stack_scenarios,
 )
-from gb_bess_revenue_stack.schemas.base import ensure_aware_utc
-from gb_bess_revenue_stack.schemas.market import WholesalePricePoint
+from gb_bess_revenue_stack.schemas.base import ensure_aware_utc, parse_source_datetime
+from gb_bess_revenue_stack.schemas.market import EACAuctionResult, WholesalePricePoint
+
+PHASE4_FIXTURES_PACKAGE = "gb_bess_revenue_stack.phase4.fixtures"
+DEFAULT_PHASE4_ELEXON_MID_SAMPLE = "phase4_elexon_mid_aligned_sample.json"
+DEFAULT_PHASE4_NESO_EAC_SAMPLE = "phase4_neso_eac_aligned_sample.json"
+PHASE4_HISTORICAL_SAMPLE_RETRIEVED_AT_UTC = datetime(2026, 5, 19, 12, tzinfo=UTC)
+PHASE4_EAC_PRODUCT_ORDER = {
+    "dynamic_containment_low": 10,
+    "dynamic_containment_high": 20,
+    "dynamic_moderation_low": 30,
+    "dynamic_moderation_high": 40,
+    "dynamic_regulation_low": 50,
+    "dynamic_regulation_high": 60,
+    "positive_quick_reserve": 70,
+    "negative_quick_reserve": 80,
+    "positive_slow_reserve": 90,
+    "negative_slow_reserve": 100,
+}
 
 
 class Phase4ScenarioSweepResult(BaseModel):
@@ -60,6 +92,114 @@ class Phase4SmokeWindowComparison(BaseModel):
     label: str
     day_count: int = Field(gt=0)
     capture: Phase4MarketStackCaptureResult
+
+
+class Phase4SmokeWindowSkip(BaseModel):
+    """Skipped 24h/48h smoke comparison with an explicit reason."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    day_count: int = Field(gt=0)
+    required_period_count: int = Field(gt=0)
+    available_period_count: int = Field(ge=0)
+    reason: str
+
+
+class Phase4HistoricalSample(BaseModel):
+    """Aligned historical Elexon MID and NESO EAC sample for release smoke runs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    prices: list[WholesalePricePoint]
+    eac_price_matrix: EACPriceMatrix
+    source_ids: list[str]
+    source_labels: dict[str, str]
+    source_snapshot_hash: str
+    caveats: list[str]
+
+    @property
+    def sample_hours(self) -> float:
+        return sum(price.duration_h for price in self.prices)
+
+
+def load_phase4_historical_sample(
+    *,
+    elexon_mid_path: Path | None = None,
+    neso_eac_path: Path | None = None,
+) -> Phase4HistoricalSample:
+    """Load the small aligned historical Elexon/NESO sample used by Phase 4 examples."""
+
+    elexon_text = _read_fixture_text(
+        path=elexon_mid_path,
+        packaged_name=DEFAULT_PHASE4_ELEXON_MID_SAMPLE,
+    )
+    neso_text = _read_fixture_text(
+        path=neso_eac_path,
+        packaged_name=DEFAULT_PHASE4_NESO_EAC_SAMPLE,
+    )
+    elexon_payload = json.loads(elexon_text)
+    neso_payload = json.loads(neso_text)
+    if not isinstance(elexon_payload, dict):
+        msg = "Phase 4 Elexon MID fixture must contain a JSON object."
+        raise ValueError(msg)
+    elexon_metadata = _fixture_metadata(elexon_payload)
+    neso_metadata = _fixture_metadata(neso_payload)
+    prices = parse_market_index_points(
+        elexon_payload,
+        source_url=f"{ELEXON_BASE_URL}{MARKET_INDEX_PATH}",
+        retrieved_at_utc=_metadata_retrieved_at(elexon_metadata),
+    )
+    price_source_url = _elexon_source_url(prices)
+    prices = [price.model_copy(update={"source_url": price_source_url}) for price in prices]
+    parsed_eac = parse_eac_summary_records(
+        _neso_fixture_records(neso_payload),
+        source_url=(
+            f"{NESO_CKAN_ACTION_BASE_URL}/datastore_search"
+            f"?resource_id={EAC_RESULTS_SUMMARY_RESOURCE_ID}"
+        ),
+        retrieved_at_utc=_metadata_retrieved_at(neso_metadata),
+    )
+    if parsed_eac.quarantined:
+        reasons = ", ".join(sorted({record.reason for record in parsed_eac.quarantined}))
+        msg = f"Phase 4 NESO fixture contains quarantined records: {reasons}."
+        raise ValueError(msg)
+    eac_matrix = build_eac_price_matrix(
+        records=parsed_eac.accepted,
+        target_periods=prices,
+        product_model_labels=_phase4_eac_product_labels(parsed_eac.accepted),
+    )
+    _validate_historical_sample_alignment(prices, eac_matrix)
+    caveats = _fixture_caveats(elexon_metadata, neso_metadata)
+    if elexon_mid_path is not None or neso_eac_path is not None:
+        caveats.append(
+            "Fixture override paths were supplied; provenance is read from fixture metadata "
+            "where present and otherwise inferred from parsed records."
+        )
+    return Phase4HistoricalSample(
+        label=_historical_sample_label(prices),
+        prices=prices,
+        eac_price_matrix=eac_matrix,
+        source_ids=[
+            _metadata_text(elexon_metadata, "source_id", "ELEXON_BMRS_MID"),
+            _metadata_text(neso_metadata, "source_id", "NESO_EAC_AUCTION_RESULTS"),
+        ],
+        source_labels={
+            "wholesale": _metadata_text(
+                elexon_metadata,
+                "source_label",
+                "Elexon BMRS MID historical proxy sample",
+            ),
+            "eac": _metadata_text(
+                neso_metadata,
+                "source_label",
+                "NESO EAC auction results historical availability sample",
+            ),
+        },
+        source_snapshot_hash=_historical_sample_hash(elexon_text, neso_text),
+        caveats=caveats,
+    )
 
 
 def build_realistic_stress_price_profile(
@@ -108,7 +248,7 @@ def default_phase4_market_stack_scenarios() -> list[RollingMarketStackScenario]:
         RollingMarketStackScenario(
             name="base_case",
             stress_label="central",
-            notes="Central synthetic stress profile with unscaled wholesale and EAC prices.",
+            notes="Central historical sample with unscaled wholesale and EAC prices.",
         ),
         RollingMarketStackScenario(
             name="winter_peak_spread",
@@ -237,13 +377,10 @@ def run_phase4_smoke_window_comparisons(
 ) -> list[Phase4SmokeWindowComparison]:
     """Run deterministic 24h/48h Phase 4 smoke comparisons where data is available."""
 
-    selected_day_counts = window_day_counts or [1, 2]
+    selected_day_counts = _selected_window_day_counts(window_day_counts)
     ordered = sorted(prices, key=lambda point: point.delivery_start_utc)
     comparisons: list[Phase4SmokeWindowComparison] = []
     for day_count in selected_day_counts:
-        if day_count <= 0:
-            msg = "window_day_counts must contain positive integers."
-            raise ValueError(msg)
         period_count = day_count * 48
         if len(ordered) < period_count:
             continue
@@ -275,6 +412,32 @@ def run_phase4_smoke_window_comparisons(
             )
         )
     return comparisons
+
+
+def skipped_phase4_smoke_windows(
+    *,
+    prices: list[WholesalePricePoint],
+    window_day_counts: list[int] | None = None,
+) -> list[Phase4SmokeWindowSkip]:
+    """Return explicit skip records for 24h/48h smoke windows lacking enough data."""
+
+    selected_day_counts = _selected_window_day_counts(window_day_counts)
+    available_period_count = len(prices)
+    skipped: list[Phase4SmokeWindowSkip] = []
+    for day_count in selected_day_counts:
+        required_period_count = day_count * 48
+        if available_period_count >= required_period_count:
+            continue
+        skipped.append(
+            Phase4SmokeWindowSkip(
+                label=f"{day_count * 24}h",
+                day_count=day_count,
+                required_period_count=required_period_count,
+                available_period_count=available_period_count,
+                reason="insufficient_periods",
+            )
+        )
+    return skipped
 
 
 def _stress_price(day_index: int, settlement_period: int) -> float:
@@ -313,5 +476,186 @@ def _slice_eac_matrix(eac_price_matrix: EACPriceMatrix, period_count: int) -> EA
     )
 
 
+def _selected_window_day_counts(window_day_counts: list[int] | None) -> list[int]:
+    selected = window_day_counts or [1, 2]
+    if any(day_count <= 0 for day_count in selected):
+        msg = "window_day_counts must contain positive integers."
+        raise ValueError(msg)
+    return selected
+
+
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def _validate_historical_sample_alignment(
+    prices: list[WholesalePricePoint],
+    eac_price_matrix: EACPriceMatrix,
+) -> None:
+    if not prices:
+        msg = "Phase 4 historical sample requires at least one Elexon MID price."
+        raise ValueError(msg)
+    expected_duration_h = prices[0].duration_h
+    seen_settlement_keys: set[tuple[str, int]] = set()
+    for price in prices:
+        if abs(price.duration_h - expected_duration_h) > 1e-9:
+            msg = "Phase 4 historical Elexon MID sample must use a uniform duration."
+            raise ValueError(msg)
+        if not _is_settlement_boundary(price.delivery_start_utc) or not _is_settlement_boundary(
+            price.delivery_end_utc
+        ):
+            msg = "Phase 4 historical Elexon MID sample must align to settlement boundaries."
+            raise ValueError(msg)
+        settlement_key = (price.settlement_date, price.settlement_period)
+        if settlement_key in seen_settlement_keys:
+            msg = "Phase 4 historical Elexon MID sample contains duplicate settlement periods."
+            raise ValueError(msg)
+        seen_settlement_keys.add(settlement_key)
+    for previous, current in zip(prices, prices[1:], strict=False):
+        if previous.delivery_start_utc >= current.delivery_start_utc:
+            msg = "Phase 4 historical Elexon MID sample must be chronologically ordered."
+            raise ValueError(msg)
+        if previous.delivery_end_utc != current.delivery_start_utc:
+            msg = "Phase 4 historical Elexon MID sample must be contiguous."
+            raise ValueError(msg)
+    uncovered = [
+        period_index
+        for period_index in range(len(prices))
+        if not eac_price_matrix.available_cells_for_period(period_index)
+    ]
+    if uncovered:
+        msg = f"NESO EAC sample does not cover Elexon period indexes {uncovered}."
+        raise ValueError(msg)
+
+
+def _historical_sample_hash(elexon_text: str, neso_text: str) -> str:
+    payload = json.dumps(
+        {
+            "elexon": json.loads(elexon_text),
+            "neso": json.loads(neso_text),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _fixture_metadata(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return {}
+    metadata = payload.get("metadata", {})
+    if not isinstance(metadata, dict):
+        msg = "Phase 4 fixture metadata must be a JSON object when present."
+        raise ValueError(msg)
+    return dict(metadata)
+
+
+def _metadata_text(metadata: dict[str, object], key: str, default: str) -> str:
+    value = metadata.get(key)
+    if value is None:
+        return default
+    return str(value)
+
+
+def _metadata_retrieved_at(metadata: dict[str, object]) -> datetime:
+    value = metadata.get("retrieved_at_utc")
+    if value is None:
+        value = metadata.get("retrievedAtUtc")
+    if value is None:
+        return PHASE4_HISTORICAL_SAMPLE_RETRIEVED_AT_UTC
+    return parse_source_datetime(str(value))
+
+
+def _fixture_caveats(
+    elexon_metadata: dict[str, object],
+    neso_metadata: dict[str, object],
+) -> list[str]:
+    elexon_caveats = _metadata_string_list(elexon_metadata, "caveats") or [
+        "Elexon MID is a public wholesale proxy, not an executable traded price.",
+        "The aligned sample is a tiny historical smoke fixture, not a bankability forecast.",
+    ]
+    neso_caveats = _metadata_string_list(neso_metadata, "caveats") or [
+        (
+            "NESO EAC rows use delivery-start known-at convention until exact publication "
+            "timestamps are verified."
+        )
+    ]
+    return elexon_caveats + neso_caveats
+
+
+def _metadata_string_list(metadata: dict[str, object], key: str) -> list[str]:
+    raw = metadata.get(key, [])
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw]
+    if not isinstance(raw, list):
+        msg = f"Phase 4 fixture metadata {key!r} must be a string list when present."
+        raise ValueError(msg)
+    return [str(item) for item in raw]
+
+
+def _neso_fixture_records(payload: object) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [_record_mapping(record) for record in payload]
+    if isinstance(payload, dict):
+        records = payload.get("records")
+        if records is None:
+            records = payload.get("data")
+        if not isinstance(records, list):
+            msg = "Phase 4 NESO EAC fixture object must contain a records list."
+            raise ValueError(msg)
+        return [_record_mapping(record) for record in records]
+    msg = "Phase 4 NESO EAC fixture must contain a JSON record list or object."
+    raise ValueError(msg)
+
+
+def _phase4_eac_product_labels(records: list[EACAuctionResult]) -> list[str]:
+    labels = {record.product_model_label for record in records}
+    return sorted(
+        labels,
+        key=lambda label: (PHASE4_EAC_PRODUCT_ORDER.get(label, 10_000), label),
+    )
+
+
+def _is_settlement_boundary(value: datetime) -> bool:
+    value = ensure_aware_utc(value)
+    return value.minute in {0, 30} and value.second == 0 and value.microsecond == 0
+
+
+def _read_fixture_text(*, path: Path | None, packaged_name: str) -> str:
+    if path is not None:
+        return path.read_text(encoding="utf-8")
+    return files(PHASE4_FIXTURES_PACKAGE).joinpath(packaged_name).read_text(encoding="utf-8")
+
+
+def _record_mapping(record: Any) -> dict[str, Any]:
+    if not isinstance(record, dict):
+        msg = "Each Phase 4 NESO EAC fixture record must be an object."
+        raise ValueError(msg)
+    return dict(record)
+
+
+def _historical_sample_label(prices: list[WholesalePricePoint]) -> str:
+    start = ensure_aware_utc(prices[0].delivery_start_utc)
+    end = ensure_aware_utc(prices[-1].delivery_end_utc)
+    if start.date() == end.date():
+        return f"elexon_mid_neso_eac_{start:%Y_%m_%d_%H%M}_{end:%H%M}_utc"
+    return f"elexon_mid_neso_eac_{start:%Y_%m_%d_%H%M}_{end:%Y_%m_%d_%H%M}_utc"
+
+
+def _elexon_source_url(prices: list[WholesalePricePoint]) -> str:
+    if not prices:
+        return f"{ELEXON_BASE_URL}{MARKET_INDEX_PATH}"
+    start = ensure_aware_utc(prices[0].delivery_start_utc)
+    end = ensure_aware_utc(prices[-1].delivery_end_utc)
+    providers = sorted({price.data_provider for price in prices if price.data_provider is not None})
+    provider_query = f"dataProviders={','.join(providers)}&" if providers else ""
+    return (
+        f"{ELEXON_BASE_URL}{MARKET_INDEX_PATH}?"
+        f"{provider_query}from={_query_time(start)}&to={_query_time(end)}"
+    )
+
+
+def _query_time(value: datetime) -> str:
+    return ensure_aware_utc(value).isoformat(timespec="seconds").replace("+00:00", "Z")

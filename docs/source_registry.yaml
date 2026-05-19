@@ -199,6 +199,19 @@ sources:
       - methodology_version_or_note
       - component_scope_if_known
       - reuse_caveat
+    release1_anchors:
+      - label: Modo GB BESS 2024 average
+        url: https://modoenergy.com/research/battery-revenues-operational-strategy-2024-gb-benchmark-year-review/
+        publication_date: 2025-02-18
+        access_date: 2026-05-19
+        methodology_status: public_summary_with_methodology_reference
+        component_scope: GB BESS average revenues in 2024, public article summary
+      - label: Modo GB BESS Index April 2024 including Capacity Market
+        url: https://modoenergy.com/research/gb-benchmark-index-battery-energy-storage-april-2024-revenue
+        publication_date: 2024-05-03
+        access_date: 2026-05-19
+        methodology_status: public_summary_with_modo_gb_index_methodology
+        component_scope: April 2024 annualised GB BESS Index including Capacity Market
     caveat: >
       Benchmarks are reconciliation anchors, not validation targets or
       proprietary model replication goals.

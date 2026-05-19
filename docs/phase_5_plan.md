@@ -12,27 +12,23 @@ bankability analysis.
   `finance_cashflows.parquet`.
 - Finance summary writes NPV, simple payback year, annualised revenue,
   degradation cost and explicit non-bankability wording.
-- Benchmark reconciliation cache writes a scorecard placeholder that labels
-  unknown public-anchor methodology as unknown and avoids replication claims.
+- Finance assumptions can be loaded from YAML through the Phase 4 smoke CLI.
+- Benchmark reconciliation cache writes sourced public anchor rows with URL,
+  access date, methodology status and caveat labels.
+- Dashboard cache writes `eac_commitments.parquet` and `data_quality.json`.
 - Cached dashboard displays Phase 5 outputs when the files are present.
 
 ## Next
 
-- Add hand-calculation tests for NPV and payback on a small deterministic
-  fixture.
-- Add configurable finance assumptions from a YAML or CLI option instead of
-  hard-coded Release 1 defaults.
-- Add source-backed public benchmark anchor rows with URL, access date,
-  methodology status and caveat labels.
-- Add `eac_commitments.parquet`, `data_quality.json` and dashboard views for
-  source-quality and EAC commitment detail.
-- Replace synthetic annualisation examples with a small aligned historical
+- Replace tiny partial-sample annualisation with a longer aligned historical
   Elexon/NESO cache once source timing and licence assumptions are verified.
+- Add deeper finance sensitivity cases: fixed O&M, augmentation timing and
+  Capacity Market annual contribution.
 
 ## Boundaries
 
 - Finance output must say `illustrative scenario appraisal`.
 - Finance output must not claim bankability, investment advice or proprietary
   benchmark replication.
-- Benchmark rows are reconciliation context only and must not become unit-test
-  targets for model calibration.
+- Benchmark rows are reconciliation context only and must not become model
+  calibration targets.

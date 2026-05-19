@@ -1,20 +1,26 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
+from importlib.resources import files
 from pathlib import Path
 from zipfile import ZipFile
 
 import pandas as pd
 import pytest
+from typer.testing import CliRunner
 
+from gb_bess_revenue_stack.cli import app
 from gb_bess_revenue_stack.commercial import CommercialBessSystem
 from gb_bess_revenue_stack.config.models import AssetConfig
 from gb_bess_revenue_stack.markets.eac_prices import synthetic_service_matrix
 from gb_bess_revenue_stack.phase4.scenarios import (
     build_realistic_stress_price_profile,
     default_phase4_market_stack_scenarios,
+    load_phase4_historical_sample,
     run_phase4_market_stack_capture_comparison,
     run_phase4_smoke_window_comparisons,
+    skipped_phase4_smoke_windows,
 )
 from gb_bess_revenue_stack.policies.forecasts import OracleForecast
 from gb_bess_revenue_stack.policies.rolling import RollingConfig
@@ -60,6 +66,102 @@ def test_default_phase4_scenarios_include_wholesale_and_eac_stresses() -> None:
     assert "winter_peak_spread" in names
     assert "low_spread_eac_downside" in names
     assert all(scenario.stress_label for scenario in scenarios)
+    assert "synthetic" not in " ".join(scenario.notes.lower() for scenario in scenarios)
+
+
+def test_phase4_historical_sample_aligns_elexon_mid_and_neso_eac() -> None:
+    sample = load_phase4_historical_sample()
+
+    assert sample.label == "elexon_mid_neso_eac_2026_04_01_0000_0230_utc"
+    assert len(sample.prices) == 5
+    assert sample.sample_hours == pytest.approx(2.5)
+    assert {price.source_id for price in sample.prices} == {"ELEXON_BMRS_MID"}
+    assert {price.price_source_type for price in sample.prices} == {"MID"}
+    assert sample.eac_price_matrix.product_model_labels == [
+        "dynamic_regulation_high",
+        "negative_quick_reserve",
+    ]
+    assert sample.source_ids == ["ELEXON_BMRS_MID", "NESO_EAC_AUCTION_RESULTS"]
+    assert sample.source_labels["wholesale"].startswith("Elexon BMRS MID")
+    assert sample.source_labels["eac"].startswith("NESO EAC auction")
+    assert all(
+        sample.eac_price_matrix.available_cells_for_period(period_index)
+        for period_index in range(len(sample.prices))
+    )
+
+    nqr = sample.eac_price_matrix.cell(
+        product_model_label="negative_quick_reserve",
+        period_index=0,
+    )
+
+    assert nqr.product_source_label == "NQR"
+    assert nqr.price_gbp_per_mw_h == pytest.approx(1.53)
+    assert nqr.source_id == "NESO_EAC_AUCTION_RESULTS"
+
+
+def test_phase4_historical_sample_defaults_are_packaged_resources() -> None:
+    fixture_root = files("gb_bess_revenue_stack.phase4.fixtures")
+
+    assert fixture_root.joinpath("phase4_elexon_mid_aligned_sample.json").is_file()
+    assert fixture_root.joinpath("phase4_neso_eac_aligned_sample.json").is_file()
+
+    sample = load_phase4_historical_sample()
+
+    assert sample.source_snapshot_hash == (
+        "93a2e8fdf909bed24b4557973d1c49679079b08277723b252861791f45972c0d"
+    )
+    assert sample.prices[0].source_url.endswith("from=2026-04-01T00:00:00Z&to=2026-04-01T02:30:00Z")
+
+
+def test_phase4_historical_sample_override_derives_label_from_fixture_window(
+    tmp_path: Path,
+) -> None:
+    fixture_root = files("gb_bess_revenue_stack.phase4.fixtures")
+    elexon_payload = json.loads(
+        fixture_root.joinpath("phase4_elexon_mid_aligned_sample.json").read_text(encoding="utf-8")
+    )
+    neso_payload = json.loads(
+        fixture_root.joinpath("phase4_neso_eac_aligned_sample.json").read_text(encoding="utf-8")
+    )
+    for row in elexon_payload["data"]:
+        row["startTime"] = row["startTime"].replace("2026-04-01", "2026-04-02")
+        row["settlementDate"] = "2026-04-02"
+    for record in neso_payload["records"]:
+        record["deliveryStart"] = record["deliveryStart"].replace("2026-04-01", "2026-04-02")
+        record["deliveryStart"] = record["deliveryStart"].replace("2026-03-31", "2026-04-01")
+        record["deliveryEnd"] = record["deliveryEnd"].replace("2026-04-01", "2026-04-02")
+
+    elexon_path = tmp_path / "shifted_elexon.json"
+    neso_path = tmp_path / "shifted_neso.json"
+    elexon_path.write_text(
+        json.dumps(elexon_payload),
+        encoding="utf-8",
+    )
+    neso_path.write_text(json.dumps(neso_payload), encoding="utf-8")
+
+    sample = load_phase4_historical_sample(
+        elexon_mid_path=elexon_path,
+        neso_eac_path=neso_path,
+    )
+
+    assert sample.label == "elexon_mid_neso_eac_2026_04_02_0000_0230_utc"
+    assert sample.prices[0].source_url.endswith("from=2026-04-02T00:00:00Z&to=2026-04-02T02:30:00Z")
+    assert "Fixture override paths were supplied" in sample.caveats[-1]
+
+
+def test_phase4_historical_sample_rejects_duplicate_settlement_periods(
+    tmp_path: Path,
+) -> None:
+    fixture_root = files("gb_bess_revenue_stack.phase4.fixtures")
+    elexon_payload = json.loads(
+        fixture_root.joinpath("phase4_elexon_mid_aligned_sample.json").read_text(encoding="utf-8")
+    )
+    elexon_payload["data"][1]["settlementPeriod"] = elexon_payload["data"][0]["settlementPeriod"]
+    elexon_path = tmp_path / "duplicate_elexon.json"
+    elexon_path.write_text(json.dumps(elexon_payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate settlement periods"):
+        load_phase4_historical_sample(elexon_mid_path=elexon_path)
 
 
 def test_market_stack_capture_comparison_reports_perfect_foresight_ceiling() -> None:
@@ -144,6 +246,61 @@ def test_phase4_smoke_window_comparisons_include_24h_and_48h_windows() -> None:
     assert by_label["48h"].capture.price_period_count == 96
     assert by_label["48h"].capture.sample_hours == pytest.approx(48)
     assert by_label["48h"].capture.capture_ratio is not None
+
+
+def test_phase4_smoke_window_skips_short_historical_samples() -> None:
+    sample = load_phase4_historical_sample()
+
+    skipped = skipped_phase4_smoke_windows(prices=sample.prices, window_day_counts=[1, 2])
+
+    assert [item.label for item in skipped] == ["24h", "48h"]
+    assert {item.reason for item in skipped} == {"insufficient_periods"}
+    assert all(item.available_period_count == len(sample.prices) for item in skipped)
+
+
+def test_phase4_smoke_command_writes_historical_source_labels(tmp_path: Path) -> None:
+    output_dir = tmp_path / "phase4"
+    dashboard_dir = tmp_path / "dashboard"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-phase4-smoke",
+            "--output-dir",
+            str(output_dir),
+            "--dashboard-dir",
+            str(dashboard_dir),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+    manifest = json.loads((dashboard_dir / "manifest.json").read_text(encoding="utf-8"))
+    caveats = json.loads((dashboard_dir / "caveats.json").read_text(encoding="utf-8"))
+    smoke_windows = json.loads(
+        (output_dir / "smoke_window_comparisons.json").read_text(encoding="utf-8")
+    )
+    rolling = json.loads((output_dir / "rolling_market_stack_run.json").read_text(encoding="utf-8"))
+
+    assert summary["historical_sample_label"] == ("elexon_mid_neso_eac_2026_04_01_0000_0230_utc")
+    assert summary["period_count"] == 5
+    assert manifest["source_labels"]["wholesale"].startswith("Elexon BMRS MID")
+    assert manifest["source_labels"]["eac"].startswith("NESO EAC auction")
+    assert manifest["known_at_policy"] == "historical_fixture_source_known_at_policy"
+    assert "PROJECT_CONVENTION" not in manifest["source_ids"]
+    assert len(rolling["steps"]) == summary["period_count"]
+    assert any(step["excluded_service_cell_count"] > 0 for step in rolling["steps"])
+    assert summary["rolling_total_revenue_gbp"] > 0
+    assert summary["rolling_policy_horizon_periods"] == 4
+    assert summary["rolling_policy_step_periods"] == 1
+    assert smoke_windows["comparisons"] == []
+    assert [item["label"] for item in smoke_windows["skipped_windows"]] == ["24h", "48h"]
+    assert any("24h smoke comparison skipped" in caveat for caveat in caveats["caveats"])
+    assert any(
+        "not 24h wholesale forecast-policy performance" in caveat for caveat in caveats["caveats"]
+    )
 
 
 def test_phase4_dashboard_cache_writer_outputs_contract_files(tmp_path: Path) -> None:

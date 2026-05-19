@@ -1,6 +1,6 @@
 # Phase 4 Stabilisation And Dashboard Cache Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Finish the Phase 4 release handoff by adding market-stack capture ratios, 24h/48h smoke comparisons, dashboard-ready cache artefacts, and residential documentation reconciliation.
 
@@ -16,21 +16,21 @@
 - Modify: `src/gb_bess_revenue_stack/phase4/scenarios.py`
 - Test: `tests/unit/test_phase4_scenarios_and_workbook.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test that calls `run_phase4_market_stack_capture_comparison` with a short synthetic market-stack case and asserts that the perfect-foresight total, rolling total, capture ratio and regret are reported.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./.venv/bin/pytest tests/unit/test_phase4_scenarios_and_workbook.py::test_market_stack_capture_comparison_reports_perfect_foresight_ceiling -q`
 
 Expected: import failure because `run_phase4_market_stack_capture_comparison` does not exist.
 
-- [ ] **Step 3: Implement the minimal code**
+- [x] **Step 3: Implement the minimal code**
 
 Add `Phase4MarketStackCaptureResult` and `run_phase4_market_stack_capture_comparison(...)`. The function should solve a perfect-foresight `solve_market_stack(...)`, compare it with a supplied no-leakage rolling run, and report capture ratio as `None` only when the perfect-foresight total is effectively zero.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run the same targeted pytest command and expect one passing test.
 
@@ -40,21 +40,21 @@ Run the same targeted pytest command and expect one passing test.
 - Modify: `src/gb_bess_revenue_stack/phase4/scenarios.py`
 - Test: `tests/unit/test_phase4_scenarios_and_workbook.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add a test for `run_phase4_smoke_window_comparisons(...)` using a two-day stress profile. Assert that the output contains `24h` and `48h` comparisons, with 48 and 96 settlement periods respectively.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./.venv/bin/pytest tests/unit/test_phase4_scenarios_and_workbook.py::test_phase4_smoke_window_comparisons_include_24h_and_48h_windows -q`
 
 Expected: import failure because `run_phase4_smoke_window_comparisons` does not exist.
 
-- [ ] **Step 3: Implement the minimal code**
+- [x] **Step 3: Implement the minimal code**
 
 Add `Phase4SmokeWindowComparison`, slice the price and EAC matrices to the requested day counts, run the rolling policy for each window, and attach capture comparison output.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run the same targeted pytest command and expect one passing test.
 
@@ -67,21 +67,21 @@ Run the same targeted pytest command and expect one passing test.
 - Test: `tests/unit/test_phase4_scenarios_and_workbook.py`
 - Test: `tests/unit/test_cli.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add a dashboard-cache writer test that expects `manifest.json`, `executive_summary.json`, `policy_capture.parquet`, `revenue_stack.parquet`, `scenario_sweeps.parquet`, and `caveats.json`. Add a CLI smoke test that runs `run-phase4-smoke` into temporary run and dashboard directories.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `./.venv/bin/pytest tests/unit/test_phase4_scenarios_and_workbook.py::test_phase4_dashboard_cache_writer_outputs_contract_files tests/unit/test_cli.py::test_run_phase4_smoke_writes_dashboard_cache -q`
 
 Expected: import/CLI failure because the writer and CLI option do not exist.
 
-- [ ] **Step 3: Implement the minimal code**
+- [x] **Step 3: Implement the minimal code**
 
 Create `Phase4DashboardCacheInput` and `write_phase4_dashboard_cache(...)`. The writer should emit the required metadata keys from `docs/dashboard_cache_contract.md`, plus compact Parquet tables for policy capture, revenue stack and scenario sweeps.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run the same targeted pytest command and expect two passing tests.
 
@@ -91,11 +91,11 @@ Run the same targeted pytest command and expect two passing tests.
 - Modify: `docs/phase_4_plan.md`
 - Modify: `docs/superpowers/plans/2026-05-19-residential-load-pv-tariff-vpp.md`
 
-- [ ] **Step 1: Update docs**
+- [x] **Step 1: Update docs**
 
 Change wording that says the residential branch has not modelled interval load/PV/tariff/VPP dispatch. State that the first bill-aware household dispatch slice is now implemented and that the remaining residential work is scenario-depth, interpretation tests and dashboard/report packaging.
 
-- [ ] **Step 2: Run docs/status checks**
+- [x] **Step 2: Run docs/status checks**
 
 Run: `./.venv/bin/pytest tests/unit/test_docs_and_reference.py tests/unit/test_residential_* -q`
 
@@ -106,7 +106,7 @@ Expected: all selected tests pass.
 **Files:**
 - No production files unless verification reveals a real issue.
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 Run:
 
@@ -117,6 +117,6 @@ Run:
 ./.venv/bin/pytest -q
 ```
 
-- [ ] **Step 2: Record coherent split guidance**
+- [x] **Step 2: Record coherent split guidance**
 
 Summarise the final WIP into reviewable groups: commercial/Phase 4 core, dashboard cache/reporting, residential branch, docs/tests.

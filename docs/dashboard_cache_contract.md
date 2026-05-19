@@ -64,11 +64,15 @@ results/dashboard/degradation_summary.json
 results/dashboard/finance_summary.json
 results/dashboard/finance_cashflows.parquet
 results/dashboard/benchmark_reconciliation.json
+results/dashboard/eac_commitments.parquet
+results/dashboard/data_quality.json
 results/dashboard/caveats.json
 ```
 
-`eac_commitments.parquet` and `data_quality.json` remain follow-on cache files
-for later dashboard/source-quality work.
+`eac_commitments.parquet` records the executed EAC reserve commitments by
+decision step, service label and direction. `data_quality.json` records source
+IDs, known-at policy, solver failure count, excluded future rows and service
+cell coverage.
 
 ## 4. Executive Summary Schema
 

@@ -2,6 +2,9 @@
 
 from gb_bess_revenue_stack.reporting.dashboard_cache import (
     Phase4DashboardCacheInput,
+    Phase4FinanceAssumptions,
+    PublicBenchmarkAnchor,
+    load_phase4_finance_assumptions,
     write_phase4_dashboard_cache,
 )
 from gb_bess_revenue_stack.reporting.investor_workbook import (
@@ -12,6 +15,9 @@ from gb_bess_revenue_stack.reporting.investor_workbook import (
 __all__ = [
     "InvestorWorkbookInput",
     "Phase4DashboardCacheInput",
+    "Phase4FinanceAssumptions",
+    "PublicBenchmarkAnchor",
+    "load_phase4_finance_assumptions",
     "write_investor_workbook",
     "write_phase4_dashboard_cache",
 ]

@@ -57,6 +57,10 @@ def test_load_dashboard_cache_reads_phase4_tables(tmp_path: Path) -> None:
     assert set(cache.revenue_stack["component"]) == {"wholesale_energy", "eac_availability"}
     assert list(cache.scenario_sweeps["scenario"]) == ["base_case"]
     assert cache.caveats["caveats"] == ["Synthetic stress profile."]
+    assert cache.eac_commitments is not None
+    assert cache.eac_commitments["service_model_label"].tolist() == ["dynamic_containment_low"]
+    assert cache.data_quality is not None
+    assert cache.data_quality["known_at_policy"] == "test_known_at_policy"
 
 
 def test_load_dashboard_cache_missing_files_fails_gracefully(tmp_path: Path) -> None:
@@ -80,6 +84,8 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     assert "rolling_policy" in model["revenue_basis"]
     assert model["scenario_count"] == 1
     assert model["caveats"] == ["Synthetic stress profile."]
+    assert model["has_eac_commitments"] is True
+    assert model["has_data_quality"] is True
 
 
 def _write_minimal_dashboard_cache(cache_dir: Path) -> None:
@@ -94,6 +100,8 @@ def _write_minimal_dashboard_cache(cache_dir: Path) -> None:
                     "revenue_stack": "revenue_stack.parquet",
                     "scenario_sweeps": "scenario_sweeps.parquet",
                     "caveats": "caveats.json",
+                    "eac_commitments": "eac_commitments.parquet",
+                    "data_quality": "data_quality.json",
                 },
             }
         ),
@@ -143,5 +151,26 @@ def _write_minimal_dashboard_cache(cache_dir: Path) -> None:
     ).to_parquet(cache_dir / "scenario_sweeps.parquet", index=False)
     (cache_dir / "caveats.json").write_text(
         json.dumps({"caveats": ["Synthetic stress profile."]}),
+        encoding="utf-8",
+    )
+    pd.DataFrame(
+        [
+            {
+                "decision_time_utc": "2024-01-01T00:00:00+00:00",
+                "service_model_label": "dynamic_containment_low",
+                "direction": "up",
+                "committed_mw": 0.25,
+                "executed_period_count": 2,
+            }
+        ]
+    ).to_parquet(cache_dir / "eac_commitments.parquet", index=False)
+    (cache_dir / "data_quality.json").write_text(
+        json.dumps(
+            {
+                "known_at_policy": "test_known_at_policy",
+                "solver_failure_count": 0,
+                "excluded_future_row_count": 0,
+            }
+        ),
         encoding="utf-8",
     )

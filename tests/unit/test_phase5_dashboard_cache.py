@@ -15,6 +15,8 @@ from gb_bess_revenue_stack.policies.rolling_market_stack import (
 )
 from gb_bess_revenue_stack.reporting.dashboard_cache import (
     Phase4DashboardCacheInput,
+    Phase4FinanceAssumptions,
+    load_phase4_finance_assumptions,
     write_phase4_dashboard_cache,
 )
 
@@ -30,11 +32,15 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert (tmp_path / "finance_summary.json").exists()
     assert (tmp_path / "finance_cashflows.parquet").exists()
     assert (tmp_path / "benchmark_reconciliation.json").exists()
+    assert (tmp_path / "eac_commitments.parquet").exists()
+    assert (tmp_path / "data_quality.json").exists()
 
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["files"]["degradation_summary"] == "degradation_summary.json"
     assert manifest["files"]["finance_cashflows"] == "finance_cashflows.parquet"
     assert manifest["files"]["benchmark_reconciliation"] == "benchmark_reconciliation.json"
+    assert manifest["files"]["eac_commitments"] == "eac_commitments.parquet"
+    assert manifest["files"]["data_quality"] == "data_quality.json"
 
 
 def test_phase5_cache_labels_finance_as_scenario_appraisal_not_bankability(
@@ -54,7 +60,90 @@ def test_phase5_cache_labels_finance_as_scenario_appraisal_not_bankability(
     assert degradation["throughput_mwh"] > 0
     assert degradation["equivalent_full_cycles"] > 0
     assert benchmark["reconciliation_scope"] == "benchmark reconciliation, not replication"
-    assert benchmark["rows"][0]["methodology_status"] == "unknown_public_anchor_placeholder"
+    assert benchmark["rows"][0]["source_url"].startswith("https://")
+    assert benchmark["rows"][0]["access_date"] == "2026-05-19"
+    assert benchmark["rows"][0]["methodology_status"] != "unknown_public_anchor_placeholder"
+
+
+def test_phase5_finance_outputs_match_hand_calculated_npv_and_payback(
+    tmp_path: Path,
+) -> None:
+    assumptions = Phase4FinanceAssumptions(
+        finance_years=3,
+        discount_rate=0.10,
+        annual_revenue_decay_rate=0,
+        degradation_cost_gbp_per_mwh_throughput=0,
+        benchmark_anchors=[],
+    )
+    payload = _phase5_payload().model_copy(
+        update={
+            "capex_gbp": 1_000,
+            "finance_assumptions": assumptions,
+        }
+    )
+    payload.central_capture.rolling_total_revenue_gbp = 600
+    payload.central_capture.sample_hours = 8760
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    finance = json.loads((tmp_path / "finance_summary.json").read_text(encoding="utf-8"))
+    cashflows = pd.read_parquet(tmp_path / "finance_cashflows.parquet")
+    expected_npv = -1000 + 600 / 1.1 + 600 / (1.1**2) + 600 / (1.1**3)
+
+    assert finance["npv_gbp"] == pytest.approx(expected_npv)
+    assert finance["simple_payback_year"] == 2
+    assert cashflows.loc[cashflows["year"] == 1, "discounted_cashflow_gbp"].iloc[
+        0
+    ] == pytest.approx(600 / 1.1)
+    assert finance["finance_assumptions"]["discount_rate"] == pytest.approx(0.10)
+
+
+def test_phase5_finance_assumptions_load_from_yaml(tmp_path: Path) -> None:
+    assumptions_path = tmp_path / "finance_assumptions.yaml"
+    assumptions_path.write_text(
+        "\n".join(
+            [
+                "finance_years: 7",
+                "discount_rate: 0.06",
+                "annual_revenue_decay_rate: 0.015",
+                "degradation_cost_gbp_per_mwh_throughput: 4.5",
+                "benchmark_anchors:",
+                "  - benchmark_label: Modo GB BESS 2024 average",
+                "    source_id: PUBLIC_BENCHMARK_ANCHORS",
+                "    source_url: https://modoenergy.com/research/battery-revenues-operational-strategy-2024-gb-benchmark-year-review/",
+                "    publication_date: '2025-02-18'",
+                "    access_date: '2026-05-19'",
+                "    methodology_status: public_summary_with_methodology_reference",
+                "    component_scope: GB BESS average revenues in 2024",
+                "    benchmark_value_gbp_per_mw_year: 50000",
+                "    caveat_labels:",
+                "      - benchmark_reconciliation_not_replication",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assumptions = load_phase4_finance_assumptions(assumptions_path)
+
+    assert assumptions.finance_years == 7
+    assert assumptions.discount_rate == pytest.approx(0.06)
+    assert assumptions.degradation_cost_gbp_per_mwh_throughput == pytest.approx(4.5)
+    assert assumptions.benchmark_anchors[0].benchmark_value_gbp_per_mw_year == pytest.approx(50_000)
+
+
+def test_phase5_cache_writes_eac_commitments_and_data_quality(tmp_path: Path) -> None:
+    write_phase4_dashboard_cache(_phase5_payload(), tmp_path)
+
+    commitments = pd.read_parquet(tmp_path / "eac_commitments.parquet")
+    data_quality = json.loads((tmp_path / "data_quality.json").read_text(encoding="utf-8"))
+
+    assert set(commitments["service_model_label"]) == {"dynamic_containment_low"}
+    assert set(commitments["direction"]) == {"up"}
+    assert commitments["committed_mw"].sum() == pytest.approx(0.25)
+    assert data_quality["known_at_policy"] == "synthetic_day_ahead_known_time"
+    assert data_quality["solver_failure_count"] == 0
+    assert data_quality["excluded_future_row_count"] == 0
+    assert data_quality["source_ids"] == ["PROJECT_CONVENTION"]
 
 
 def _phase5_payload() -> Phase4DashboardCacheInput:
@@ -142,6 +231,7 @@ def _phase5_payload() -> Phase4DashboardCacheInput:
             "eac": "synthetic EAC availability proxy",
         },
         battery_energy_capacity_mwh=2,
+        battery_power_mw=1,
         capex_gbp=20_000_000,
         created_at_utc=datetime(2024, 1, 2, tzinfo=UTC),
     )

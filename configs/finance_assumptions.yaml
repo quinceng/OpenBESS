@@ -1,0 +1,28 @@
+finance_years: 15
+discount_rate: 0.08
+annual_revenue_decay_rate: 0.02
+degradation_cost_gbp_per_mwh_throughput: 2.0
+benchmark_anchors:
+  - benchmark_label: Modo GB BESS 2024 average
+    source_id: PUBLIC_BENCHMARK_ANCHORS
+    source_url: https://modoenergy.com/research/battery-revenues-operational-strategy-2024-gb-benchmark-year-review/
+    publication_date: "2025-02-18"
+    access_date: "2026-05-19"
+    methodology_status: public_summary_with_methodology_reference
+    component_scope: GB BESS average revenues in 2024, public article summary
+    benchmark_value_gbp_per_mw_year: 50000
+    caveat_labels:
+      - benchmark_reconciliation_not_replication
+      - public_summary_value
+  - benchmark_label: Modo GB BESS Index April 2024 including Capacity Market
+    source_id: PUBLIC_BENCHMARK_ANCHORS
+    source_url: https://modoenergy.com/research/gb-benchmark-index-battery-energy-storage-april-2024-revenue
+    publication_date: "2024-05-03"
+    access_date: "2026-05-19"
+    methodology_status: public_summary_with_modo_gb_index_methodology
+    component_scope: April 2024 annualised GB BESS Index including Capacity Market
+    benchmark_value_gbp_per_mw_year: 54000
+    caveat_labels:
+      - benchmark_reconciliation_not_replication
+      - includes_capacity_market
+      - public_summary_value

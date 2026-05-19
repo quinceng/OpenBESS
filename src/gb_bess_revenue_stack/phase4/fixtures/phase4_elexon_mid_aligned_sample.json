@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "source_id": "ELEXON_BMRS_MID",
+    "source_label": "Elexon BMRS MID APXMIDP historical proxy sample",
+    "retrieved_at_utc": "2026-05-19T12:00:00Z",
+    "datasets": [
+      "MID"
+    ],
+    "fixture_note": "Aligned Phase 4 smoke fixture: Elexon MID APXMIDP rows overlapping the NESO EAC auction windows in phase4_neso_eac_aligned_sample.json.",
+    "caveats": [
+      "Elexon MID is a public wholesale proxy, not an executable traded price.",
+      "The aligned sample is a tiny historical smoke fixture, not a bankability forecast."
+    ]
+  },
+  "data": [
+    {
+      "startTime": "2026-04-01T00:00:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2026-04-01",
+      "settlementPeriod": 3,
+      "price": 92.88,
+      "volume": 1690.0
+    },
+    {
+      "startTime": "2026-04-01T00:30:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2026-04-01",
+      "settlementPeriod": 4,
+      "price": 98.58,
+      "volume": 1915.85
+    },
+    {
+      "startTime": "2026-04-01T01:00:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2026-04-01",
+      "settlementPeriod": 5,
+      "price": 97.21,
+      "volume": 1873.3
+    },
+    {
+      "startTime": "2026-04-01T01:30:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2026-04-01",
+      "settlementPeriod": 6,
+      "price": 95.23,
+      "volume": 2256.45
+    },
+    {
+      "startTime": "2026-04-01T02:00:00Z",
+      "dataProvider": "APXMIDP",
+      "settlementDate": "2026-04-01",
+      "settlementPeriod": 7,
+      "price": 90.7,
+      "volume": 1755.1
+    }
+  ]
+}

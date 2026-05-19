@@ -1,0 +1,90 @@
+{
+  "metadata": {
+    "source_id": "NESO_EAC_AUCTION_RESULTS",
+    "source_label": "NESO EAC auction results historical availability sample",
+    "retrieved_at_utc": "2026-05-19T12:00:00Z",
+    "fixture_note": "Aligned Phase 4 smoke fixture: NESO EAC auction-result rows covering the Elexon MID APXMIDP rows in phase4_elexon_mid_aligned_sample.json.",
+    "caveats": [
+      "NESO EAC rows use delivery-start known-at convention until exact publication timestamps are verified."
+    ]
+  },
+  "records": [
+  {
+    "_id": 1,
+    "auctionID": 2661,
+    "auctionProduct": "DRH",
+    "serviceType": "Response",
+    "deliveryStart": "2026-03-31T22:00:00Z",
+    "deliveryEnd": "2026-04-01T02:00:00Z",
+    "clearedVolume": 500,
+    "clearingPrice": -9.19,
+    "linkedServiceWindowID": null
+  },
+  {
+    "_id": 2,
+    "auctionID": 2661,
+    "auctionProduct": "DRH",
+    "serviceType": "Response",
+    "deliveryStart": "2026-04-01T02:00:00Z",
+    "deliveryEnd": "2026-04-01T06:00:00Z",
+    "clearedVolume": 499,
+    "clearingPrice": -7.68,
+    "linkedServiceWindowID": null
+  },
+  {
+    "_id": 11,
+    "auctionID": 2661,
+    "auctionProduct": "NQR",
+    "serviceType": "Quick Reserve",
+    "deliveryStart": "2026-04-01T00:00:00Z",
+    "deliveryEnd": "2026-04-01T00:30:00Z",
+    "clearedVolume": 300,
+    "clearingPrice": 1.53,
+    "linkedServiceWindowID": null
+  },
+  {
+    "_id": 12,
+    "auctionID": 2661,
+    "auctionProduct": "NQR",
+    "serviceType": "Quick Reserve",
+    "deliveryStart": "2026-04-01T00:30:00Z",
+    "deliveryEnd": "2026-04-01T01:00:00Z",
+    "clearedVolume": 300,
+    "clearingPrice": 1.0,
+    "linkedServiceWindowID": null
+  },
+  {
+    "_id": 13,
+    "auctionID": 2661,
+    "auctionProduct": "NQR",
+    "serviceType": "Quick Reserve",
+    "deliveryStart": "2026-04-01T01:00:00Z",
+    "deliveryEnd": "2026-04-01T01:30:00Z",
+    "clearedVolume": 300,
+    "clearingPrice": 1.05,
+    "linkedServiceWindowID": null
+  },
+  {
+    "_id": 14,
+    "auctionID": 2661,
+    "auctionProduct": "NQR",
+    "serviceType": "Quick Reserve",
+    "deliveryStart": "2026-04-01T01:30:00Z",
+    "deliveryEnd": "2026-04-01T02:00:00Z",
+    "clearedVolume": 300,
+    "clearingPrice": 1.0,
+    "linkedServiceWindowID": null
+  },
+  {
+    "_id": 15,
+    "auctionID": 2661,
+    "auctionProduct": "NQR",
+    "serviceType": "Quick Reserve",
+    "deliveryStart": "2026-04-01T02:00:00Z",
+    "deliveryEnd": "2026-04-01T02:30:00Z",
+    "clearedVolume": 292,
+    "clearingPrice": 5.0,
+    "linkedServiceWindowID": null
+  }
+  ]
+}

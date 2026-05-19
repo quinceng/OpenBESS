@@ -1,6 +1,6 @@
 # Dashboard And Phase 5 Cache Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build a cached Streamlit dashboard that reads only `results/dashboard/*`, then extend the cache with Phase 5 degradation, finance and benchmark reconciliation artefacts.
 
@@ -17,11 +17,11 @@
 - Create: `dashboard/streamlit_app.py`
 - Test: `tests/unit/test_dashboard_cache_reader.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests that import the dashboard module, load a minimal cache fixture, raise a clear `DashboardCacheError` for missing files, and block imports of `pyomo`, `highspy`, `httpx`, `tenacity`, `gb_bess_revenue_stack.data`, `gb_bess_revenue_stack.optimisation` and `gb_bess_revenue_stack.phase4` during dashboard import.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -31,11 +31,11 @@ Run:
 
 Expected: fail because `dashboard/cache_reader.py` and `dashboard/streamlit_app.py` do not exist.
 
-- [ ] **Step 3: Implement reader and UI**
+- [x] **Step 3: Implement reader and UI**
 
 Create a reader that loads `manifest.json`, `executive_summary.json`, `policy_capture.parquet`, `revenue_stack.parquet`, `scenario_sweeps.parquet` and `caveats.json`. The UI should display capture ratio, revenue stack split, 24h/48h comparisons, scenario table, caveats and source labels.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run the targeted dashboard tests and ensure they pass.
 
@@ -46,11 +46,11 @@ Run the targeted dashboard tests and ensure they pass.
 - Modify: `src/gb_bess_revenue_stack/cli.py`
 - Test: `tests/unit/test_phase5_dashboard_cache.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests that expect `degradation_summary.json`, `finance_summary.json`, `finance_cashflows.parquet` and `benchmark_reconciliation.json` after writing a Phase 4 dashboard cache.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -60,11 +60,11 @@ Run:
 
 Expected: fail because those Phase 5 cache files are not written yet.
 
-- [ ] **Step 3: Implement minimal Phase 5 calculations**
+- [x] **Step 3: Implement minimal Phase 5 calculations**
 
 Compute throughput from rolling run steps, a simple degradation proxy, illustrative 15-year finance cashflows, NPV/payback, and a benchmark reconciliation scorecard with caveat labels. Label all finance as scenario appraisal, not bankability.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run the targeted Phase 5 tests and ensure they pass.
 
@@ -76,11 +76,11 @@ Run the targeted Phase 5 tests and ensure they pass.
 - Modify: `docs/release_checklist.md`
 - Modify: `docs/reproducibility.md`
 
-- [ ] **Step 1: Update docs**
+- [x] **Step 1: Update docs**
 
 Document the dashboard command, cached-only boundary, Phase 5 cache files and remaining lower-priority work: aligned historical sample, residential scenario depth and release hardening.
 
-- [ ] **Step 2: Full verification**
+- [x] **Step 2: Full verification**
 
 Run:
 
@@ -91,6 +91,6 @@ Run:
 ./.venv/bin/pytest -q
 ```
 
-- [ ] **Step 3: Commit split**
+- [x] **Step 3: Commit split**
 
 Commit dashboard reader/UI and Phase 5 cache/docs as separate coherent commits if both slices land cleanly.
