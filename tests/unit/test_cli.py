@@ -52,7 +52,9 @@ def test_cli_exposes_run_phase4_smoke_subcommand() -> None:
     assert result.exit_code == 0
     assert "--output-dir" in result.output
     assert "--dashboard-dir" in result.output
-    assert "--day-count" in result.output
+    assert "--elexon-mid-fixture" in result.output
+    assert "--neso-eac-fixture" in result.output
+    assert "--finance-assumptions-yaml" in result.output
 
 
 def test_cli_exposes_run_residential_household_smoke_subcommand() -> None:

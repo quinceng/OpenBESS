@@ -61,3 +61,20 @@ def test_capacity_market_reference_scenarios_validate() -> None:
         "t1_2025_26_two_hour_research_anchor",
         "t4_2028_29_two_hour_research_anchor",
     }
+
+
+def test_release_docs_record_historical_phase4_and_residential_scenario_sweeps() -> None:
+    phase4_plan = (ROOT / "docs/phase_4_plan.md").read_text(encoding="utf-8")
+    release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
+    residential_assumptions = (ROOT / "docs/residential_bess_assumptions.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "aligned historical Elexon/NESO sample" in phase4_plan
+    assert "Phase 4 default smoke sample is historical" in release_checklist
+    assert "Residential Scenario Sweeps" in residential_assumptions
+
+
+def test_release_hardening_files_exist() -> None:
+    assert (ROOT / "LICENSE").is_file()
+    assert (ROOT / "CHANGELOG.md").is_file()

@@ -35,6 +35,9 @@ Use this checklist before publishing Release 1.
 - Processed datasets have manifests.
 - Raw and processed data policy is documented.
 - Tiny fixtures exist where licence permits.
+- Phase 4 default smoke sample is historical and aligned across Elexon MID and NESO EAC rows.
+- Short Phase 4 smoke windows record explicit skipped-window reasons.
+- Default Phase 4 fixture hash is pinned in unit tests; fixture edits must update the digest intentionally.
 - DST tests pass.
 - Missing-data classifications are visible.
 - Negative prices are preserved.
@@ -82,6 +85,7 @@ Use this checklist before publishing Release 1.
 - Dashboard does not call live APIs.
 - Dashboard does not require solver.
 - Dashboard import guard blocks solver and source-client imports.
+- Dashboard cache includes EAC commitments and data-quality summary files.
 - All charts have units.
 - Caveats are visible without opening methodology.
 - Missing cache files fail gracefully.
@@ -92,6 +96,7 @@ Use this checklist before publishing Release 1.
 - Methodology includes equations and boundaries.
 - Reproducibility guide is accurate.
 - Known limitations are visible.
+- Residential scenario sweep caveats are visible.
 - Interview demo script exists.
 - Phase reviews exist for completed phases.
 - README, dashboard and methodology tell the same story.
