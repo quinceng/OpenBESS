@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from gb_bess_revenue_stack.cli import app
@@ -11,84 +12,71 @@ from gb_bess_revenue_stack.cli import app
 pytestmark = pytest.mark.unit
 
 
-def test_cli_exposes_fetch_data_subcommand() -> None:
-    runner = CliRunner()
-
-    result = runner.invoke(app, ["fetch-data", "--help"])
+def command_help(*args: str) -> str:
+    result = CliRunner().invoke(
+        app,
+        [*args, "--help"],
+        env={"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"},
+    )
 
     assert result.exit_code == 0
-    assert "--source" in result.output
+    return unstyle(result.output)
+
+
+def test_cli_exposes_fetch_data_subcommand() -> None:
+    output = command_help("fetch-data")
+
+    assert "--source" in output
 
 
 def test_cli_exposes_run_smoke_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("run-smoke")
 
-    result = runner.invoke(app, ["run-smoke", "--help"])
-
-    assert result.exit_code == 0
-    assert "--output-dir" in result.output
+    assert "--output-dir" in output
 
 
 def test_cli_exposes_run_rolling_smoke_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("run-rolling-smoke")
 
-    result = runner.invoke(app, ["run-rolling-smoke", "--help"])
-
-    assert result.exit_code == 0
-    assert "--output-dir" in result.output
+    assert "--output-dir" in output
 
 
 def test_cli_exposes_run_market_stack_smoke_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("run-market-stack-smoke")
 
-    result = runner.invoke(app, ["run-market-stack-smoke", "--help"])
-
-    assert result.exit_code == 0
-    assert "--output-dir" in result.output
+    assert "--output-dir" in output
 
 
 def test_cli_exposes_run_phase4_smoke_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("run-phase4-smoke")
 
-    result = runner.invoke(app, ["run-phase4-smoke", "--help"])
-
-    assert result.exit_code == 0
-    assert "--output-dir" in result.output
-    assert "--dashboard-dir" in result.output
-    assert "--elexon-mid-fixture" in result.output
-    assert "--neso-eac-fixture" in result.output
-    assert "--finance-assumptions-yaml" in result.output
+    assert "--output-dir" in output
+    assert "--dashboard-dir" in output
+    assert "--elexon-mid-fixture" in output
+    assert "--neso-eac-fixture" in output
+    assert "--finance-assumptions-yaml" in output
 
 
 def test_cli_exposes_run_residential_household_smoke_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("run-residential-household-smoke")
 
-    result = runner.invoke(app, ["run-residential-household-smoke", "--help"])
-
-    assert result.exit_code == 0
-    assert "--profile-csv" in result.output
-    assert "--tariff-csv" in result.output
-    assert "--output-dir" in result.output
+    assert "--profile-csv" in output
+    assert "--tariff-csv" in output
+    assert "--output-dir" in output
 
 
 def test_cli_exposes_run_residential_scenario_sweep_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("run-residential-scenario-sweep")
 
-    result = runner.invoke(app, ["run-residential-scenario-sweep", "--help"])
-
-    assert result.exit_code == 0
-    assert "--output-dir" in result.output
+    assert "--output-dir" in output
 
 
 def test_cli_exposes_build_stack_series_subcommand() -> None:
-    runner = CliRunner()
+    output = command_help("build-stack-series")
 
-    result = runner.invoke(app, ["build-stack-series", "--help"])
-
-    assert result.exit_code == 0
-    assert "OpenBESS Stack Index" in result.output
-    assert "--cache-dir" in result.output
-    assert "--output-dir" in result.output
+    assert "OpenBESS Stack Index" in output
+    assert "--cache-dir" in output
+    assert "--output-dir" in output
 
 
 def test_build_stack_series_reports_invalid_cache_row(tmp_path: Path) -> None:
