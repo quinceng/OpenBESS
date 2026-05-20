@@ -7,7 +7,7 @@ import pytest
 from click import unstyle
 from typer.testing import CliRunner
 
-from gb_bess_revenue_stack.cli import app
+from gb_bess_revenue_stack.cli import _cm_sidecar_for_asset, app
 
 pytestmark = pytest.mark.unit
 
@@ -55,6 +55,35 @@ def test_cli_exposes_run_phase4_smoke_subcommand() -> None:
     assert "--elexon-mid-fixture" in output
     assert "--neso-eac-fixture" in output
     assert "--finance-assumptions-yaml" in output
+
+
+def test_cli_exposes_build_phase4_aligned_cache_subcommand() -> None:
+    output = command_help("build-phase4-aligned-cache")
+
+    assert "--start" in output
+    assert "--days" in output
+    assert "--provider" in output
+    assert "--neso-page-size" in output
+
+
+def test_cli_exposes_run_release_cache_subcommand() -> None:
+    output = command_help("run-release-cache")
+
+    assert "--aligned-cache-dir" in output
+    assert "--dashboard-dir" in output
+    assert "--asset-id" in output
+    assert "--cm-scenarios-yaml" in output
+    assert "--horizon-periods" in output
+
+
+def test_cm_sidecar_selects_matching_duration_t4_scenario() -> None:
+    label, annual_value = _cm_sidecar_for_asset(
+        cm_scenarios_yaml=Path("configs/scenarios_cm.yaml"),
+        asset_duration_hours=2,
+    )
+
+    assert label == "t4_2028_29_two_hour_research_anchor"
+    assert annual_value == pytest.approx(0.2094 * 60.0 * 1000)
 
 
 def test_cli_exposes_run_residential_household_smoke_subcommand() -> None:

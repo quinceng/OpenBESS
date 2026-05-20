@@ -23,7 +23,7 @@ from gb_bess_revenue_stack.data.neso import (
 from gb_bess_revenue_stack.markets.eac_prices import EACPriceMatrix, build_eac_price_matrix
 from gb_bess_revenue_stack.optimisation.inputs import TerminalSocPolicy
 from gb_bess_revenue_stack.optimisation.market_stack_model import solve_market_stack
-from gb_bess_revenue_stack.policies.forecasts import ForecastModel
+from gb_bess_revenue_stack.policies.forecasts import ForecastModel, ForecastPoint, ForecastResult
 from gb_bess_revenue_stack.policies.rolling import RollingConfig
 from gb_bess_revenue_stack.policies.rolling_market_stack import (
     RollingMarketStackRun,
@@ -106,6 +106,36 @@ class Phase4SmokeWindowSkip(BaseModel):
     reason: str
 
 
+class Phase4ForecastErrorScenario(BaseModel):
+    """Deterministic forecast-error case for rolling-policy sensitivity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    price_scalar: float = Field(default=1.0, ge=0)
+    price_bias_gbp_per_mwh: float = 0.0
+    notes: str = ""
+
+
+class Phase4ForecastErrorSweepResult(BaseModel):
+    """Compact result from one forecast-error rolling-policy sensitivity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    forecast_model: str
+    period_count: int = Field(ge=0)
+    price_scalar: float
+    price_bias_gbp_per_mwh: float
+    forecast_mae_gbp_per_mwh: float
+    forecast_rmse_gbp_per_mwh: float
+    rolling_energy_revenue_gbp: float
+    rolling_service_revenue_gbp: float
+    rolling_total_revenue_gbp: float
+    capture_ratio: float | None
+    final_soc_mwh: float
+
+
 class Phase4HistoricalSample(BaseModel):
     """Aligned historical Elexon MID and NESO EAC sample for release smoke runs."""
 
@@ -146,22 +176,77 @@ def load_phase4_historical_sample(
         raise ValueError(msg)
     elexon_metadata = _fixture_metadata(elexon_payload)
     neso_metadata = _fixture_metadata(neso_payload)
+    sample = build_phase4_historical_sample_from_source_records(
+        elexon_payload=elexon_payload,
+        neso_records=_neso_fixture_records(neso_payload),
+        elexon_source_url=f"{ELEXON_BASE_URL}{MARKET_INDEX_PATH}",
+        neso_source_url=(
+            f"{NESO_CKAN_ACTION_BASE_URL}/datastore_search"
+            f"?resource_id={EAC_RESULTS_SUMMARY_RESOURCE_ID}"
+        ),
+        retrieved_at_utc=_metadata_retrieved_at(elexon_metadata),
+        elexon_source_id=_metadata_text(elexon_metadata, "source_id", "ELEXON_BMRS_MID"),
+        neso_source_id=_metadata_text(neso_metadata, "source_id", "NESO_EAC_AUCTION_RESULTS"),
+        wholesale_source_label=_metadata_text(
+            elexon_metadata,
+            "source_label",
+            "Elexon BMRS MID historical proxy sample",
+        ),
+        eac_source_label=_metadata_text(
+            neso_metadata,
+            "source_label",
+            "NESO EAC auction results historical availability sample",
+        ),
+        caveats=_fixture_caveats(elexon_metadata, neso_metadata),
+        strict_eac_coverage=True,
+    )
+    sample = sample.model_copy(
+        update={"source_snapshot_hash": _historical_sample_hash(elexon_text, neso_text)}
+    )
+    if elexon_mid_path is not None or neso_eac_path is not None:
+        return sample.model_copy(
+            update={
+                "caveats": [
+                    *sample.caveats,
+                    (
+                        "Fixture override paths were supplied; provenance is read from fixture "
+                        "metadata where present and otherwise inferred from parsed records."
+                    ),
+                ]
+            }
+        )
+    return sample
+
+
+def build_phase4_historical_sample_from_source_records(
+    *,
+    elexon_payload: dict[str, Any],
+    neso_records: list[dict[str, Any]],
+    elexon_source_url: str,
+    neso_source_url: str,
+    retrieved_at_utc: datetime,
+    elexon_source_id: str = "ELEXON_BMRS_MID",
+    neso_source_id: str = "NESO_EAC_AUCTION_RESULTS",
+    wholesale_source_label: str = "Elexon BMRS MID historical proxy sample",
+    eac_source_label: str = "NESO EAC auction results historical availability sample",
+    caveats: list[str] | None = None,
+    strict_eac_coverage: bool = True,
+) -> Phase4HistoricalSample:
+    """Build a Phase 4 sample from source records or generated aligned cache files."""
+
     prices = parse_market_index_points(
         elexon_payload,
-        source_url=f"{ELEXON_BASE_URL}{MARKET_INDEX_PATH}",
-        retrieved_at_utc=_metadata_retrieved_at(elexon_metadata),
+        source_url=elexon_source_url,
+        retrieved_at_utc=retrieved_at_utc,
     )
     price_source_url = _elexon_source_url(prices)
     prices = [price.model_copy(update={"source_url": price_source_url}) for price in prices]
     parsed_eac = parse_eac_summary_records(
-        _neso_fixture_records(neso_payload),
-        source_url=(
-            f"{NESO_CKAN_ACTION_BASE_URL}/datastore_search"
-            f"?resource_id={EAC_RESULTS_SUMMARY_RESOURCE_ID}"
-        ),
-        retrieved_at_utc=_metadata_retrieved_at(neso_metadata),
+        neso_records,
+        source_url=neso_source_url,
+        retrieved_at_utc=retrieved_at_utc,
     )
-    if parsed_eac.quarantined:
+    if strict_eac_coverage and parsed_eac.quarantined:
         reasons = ", ".join(sorted({record.reason for record in parsed_eac.quarantined}))
         msg = f"Phase 4 NESO fixture contains quarantined records: {reasons}."
         raise ValueError(msg)
@@ -170,35 +255,36 @@ def load_phase4_historical_sample(
         target_periods=prices,
         product_model_labels=_phase4_eac_product_labels(parsed_eac.accepted),
     )
-    _validate_historical_sample_alignment(prices, eac_matrix)
-    caveats = _fixture_caveats(elexon_metadata, neso_metadata)
-    if elexon_mid_path is not None or neso_eac_path is not None:
-        caveats.append(
-            "Fixture override paths were supplied; provenance is read from fixture metadata "
-            "where present and otherwise inferred from parsed records."
+    _validate_historical_sample_alignment(
+        prices,
+        eac_matrix,
+        strict_eac_coverage=strict_eac_coverage,
+    )
+    sample_caveats = list(caveats or [])
+    if parsed_eac.quarantined:
+        quarantine_reasons = sorted({record.reason for record in parsed_eac.quarantined})
+        sample_caveats.append(
+            "NESO EAC rows with unsupported product labels were quarantined: "
+            + ", ".join(quarantine_reasons)
+            + "."
         )
+    if not strict_eac_coverage:
+        source_gap_periods = _eac_source_gap_period_count(prices, eac_matrix)
+        if source_gap_periods:
+            sample_caveats.append(
+                f"NESO EAC source gaps are retained for {source_gap_periods} settlement periods."
+            )
     return Phase4HistoricalSample(
         label=_historical_sample_label(prices),
         prices=prices,
         eac_price_matrix=eac_matrix,
-        source_ids=[
-            _metadata_text(elexon_metadata, "source_id", "ELEXON_BMRS_MID"),
-            _metadata_text(neso_metadata, "source_id", "NESO_EAC_AUCTION_RESULTS"),
-        ],
+        source_ids=[elexon_source_id, neso_source_id],
         source_labels={
-            "wholesale": _metadata_text(
-                elexon_metadata,
-                "source_label",
-                "Elexon BMRS MID historical proxy sample",
-            ),
-            "eac": _metadata_text(
-                neso_metadata,
-                "source_label",
-                "NESO EAC auction results historical availability sample",
-            ),
+            "wholesale": wholesale_source_label,
+            "eac": eac_source_label,
         },
-        source_snapshot_hash=_historical_sample_hash(elexon_text, neso_text),
-        caveats=caveats,
+        source_snapshot_hash=_historical_sample_payload_hash(elexon_payload, neso_records),
+        caveats=sample_caveats,
     )
 
 
@@ -288,6 +374,37 @@ def default_phase4_market_stack_scenarios() -> list[RollingMarketStackScenario]:
     ]
 
 
+def default_phase4_forecast_error_scenarios() -> list[Phase4ForecastErrorScenario]:
+    """Return deterministic forecast-error cases for Release 1 sensitivity outputs."""
+
+    return [
+        Phase4ForecastErrorScenario(
+            name="base_forecast",
+            notes="Unadjusted configured rolling forecast model.",
+        ),
+        Phase4ForecastErrorScenario(
+            name="price_underforecast_10pct",
+            price_scalar=0.9,
+            notes="Forecast prices scaled down by 10 percent.",
+        ),
+        Phase4ForecastErrorScenario(
+            name="price_overforecast_10pct",
+            price_scalar=1.1,
+            notes="Forecast prices scaled up by 10 percent.",
+        ),
+        Phase4ForecastErrorScenario(
+            name="negative_bias_20_gbp_per_mwh",
+            price_bias_gbp_per_mwh=-20.0,
+            notes="Forecast prices shifted down by GBP 20/MWh.",
+        ),
+        Phase4ForecastErrorScenario(
+            name="positive_bias_20_gbp_per_mwh",
+            price_bias_gbp_per_mwh=20.0,
+            notes="Forecast prices shifted up by GBP 20/MWh.",
+        ),
+    ]
+
+
 def run_phase4_market_stack_sweep(
     *,
     prices: list[WholesalePricePoint],
@@ -316,6 +433,64 @@ def run_phase4_market_stack_sweep(
         stress_day_count=len(dates),
         scenario_results=results,
     )
+
+
+def run_phase4_forecast_error_sweep(
+    *,
+    prices: list[WholesalePricePoint],
+    eac_price_matrix: EACPriceMatrix,
+    asset: AssetConfig,
+    initial_soc_mwh: float,
+    forecast_model: ForecastModel,
+    config: RollingConfig,
+    scenarios: list[Phase4ForecastErrorScenario] | None = None,
+) -> list[Phase4ForecastErrorSweepResult]:
+    """Run deterministic forecast-error sensitivities for the rolling market stack."""
+
+    selected = default_phase4_forecast_error_scenarios() if scenarios is None else scenarios
+    results: list[Phase4ForecastErrorSweepResult] = []
+    for scenario in selected:
+        adjusted = _AdjustedForecastModel(
+            base_model=forecast_model,
+            price_scalar=scenario.price_scalar,
+            price_bias_gbp_per_mwh=scenario.price_bias_gbp_per_mwh,
+            scenario_name=scenario.name,
+        )
+        rolling = run_rolling_market_stack_policy(
+            prices=prices,
+            eac_price_matrix=eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            forecast_model=adjusted,
+            config=config,
+        )
+        capture = run_phase4_market_stack_capture_comparison(
+            prices=prices,
+            eac_price_matrix=eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            rolling_run=rolling,
+            terminal_soc_policy=config.terminal_soc_policy,  # type: ignore[arg-type]
+            terminal_soc_target_mwh=config.terminal_soc_target_mwh,
+            solver_config=config.solver,
+        )
+        results.append(
+            Phase4ForecastErrorSweepResult(
+                name=scenario.name,
+                forecast_model=rolling.forecast_model,
+                period_count=len(prices),
+                price_scalar=scenario.price_scalar,
+                price_bias_gbp_per_mwh=scenario.price_bias_gbp_per_mwh,
+                forecast_mae_gbp_per_mwh=capture.forecast_mae_gbp_per_mwh,
+                forecast_rmse_gbp_per_mwh=capture.forecast_rmse_gbp_per_mwh,
+                rolling_energy_revenue_gbp=rolling.realised_energy_revenue_gbp,
+                rolling_service_revenue_gbp=rolling.realised_service_revenue_gbp,
+                rolling_total_revenue_gbp=rolling.realised_total_revenue_gbp,
+                capture_ratio=capture.capture_ratio,
+                final_soc_mwh=rolling.final_soc_mwh,
+            )
+        )
+    return results
 
 
 def run_phase4_market_stack_capture_comparison(
@@ -488,10 +663,62 @@ def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+class _AdjustedForecastModel:
+    def __init__(
+        self,
+        *,
+        base_model: ForecastModel,
+        price_scalar: float,
+        price_bias_gbp_per_mwh: float,
+        scenario_name: str,
+    ) -> None:
+        self.base_model = base_model
+        self.price_scalar = price_scalar
+        self.price_bias_gbp_per_mwh = price_bias_gbp_per_mwh
+        self.source_model = (
+            f"{base_model.source_model}:{scenario_name}:"
+            f"scalar={price_scalar}:bias={price_bias_gbp_per_mwh}"
+        )
+
+    def predict(
+        self,
+        information_set: Any,
+        *,
+        target_periods: list[WholesalePricePoint],
+    ) -> ForecastResult:
+        base = self.base_model.predict(information_set, target_periods=target_periods)
+        points = [
+            ForecastPoint(
+                **{
+                    **point.model_dump(),
+                    "forecast_value_gbp_per_mwh": (
+                        point.forecast_value_gbp_per_mwh * self.price_scalar
+                        + self.price_bias_gbp_per_mwh
+                    ),
+                    "source_model": self.source_model,
+                }
+            )
+            for point in base.points
+        ]
+        return ForecastResult(
+            points=points,
+            source_model=self.source_model,
+            source_data_hash=base.source_data_hash,
+        )
+
+
 def _validate_historical_sample_alignment(
     prices: list[WholesalePricePoint],
     eac_price_matrix: EACPriceMatrix,
+    *,
+    strict_eac_coverage: bool = True,
 ) -> None:
+    _validate_price_sample_alignment(prices)
+    if strict_eac_coverage:
+        _validate_eac_period_coverage(prices, eac_price_matrix)
+
+
+def _validate_price_sample_alignment(prices: list[WholesalePricePoint]) -> None:
     if not prices:
         msg = "Phase 4 historical sample requires at least one Elexon MID price."
         raise ValueError(msg)
@@ -518,6 +745,12 @@ def _validate_historical_sample_alignment(
         if previous.delivery_end_utc != current.delivery_start_utc:
             msg = "Phase 4 historical Elexon MID sample must be contiguous."
             raise ValueError(msg)
+
+
+def _validate_eac_period_coverage(
+    prices: list[WholesalePricePoint],
+    eac_price_matrix: EACPriceMatrix,
+) -> None:
     uncovered = [
         period_index
         for period_index in range(len(prices))
@@ -528,16 +761,39 @@ def _validate_historical_sample_alignment(
         raise ValueError(msg)
 
 
+def _eac_source_gap_period_count(
+    prices: list[WholesalePricePoint],
+    eac_price_matrix: EACPriceMatrix,
+) -> int:
+    return sum(
+        1
+        for period_index in range(len(prices))
+        if not eac_price_matrix.available_cells_for_period(period_index)
+    )
+
+
 def _historical_sample_hash(elexon_text: str, neso_text: str) -> str:
-    payload = json.dumps(
+    payload = _canonical_source_payload(json.loads(elexon_text), json.loads(neso_text))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _historical_sample_payload_hash(
+    elexon_payload: dict[str, Any],
+    neso_records: list[dict[str, Any]],
+) -> str:
+    payload = _canonical_source_payload(elexon_payload, neso_records)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _canonical_source_payload(elexon_payload: object, neso_payload: object) -> str:
+    return json.dumps(
         {
-            "elexon": json.loads(elexon_text),
-            "neso": json.loads(neso_text),
+            "elexon": elexon_payload,
+            "neso": neso_payload,
         },
         sort_keys=True,
         separators=(",", ":"),
     )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _fixture_metadata(payload: object) -> dict[str, object]:

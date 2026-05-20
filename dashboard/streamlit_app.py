@@ -48,6 +48,8 @@ def build_view_model(cache: DashboardCache) -> dict[str, Any]:
         "has_eac_commitments": cache.eac_commitments is not None,
         "has_data_quality": cache.data_quality is not None,
         "has_stack_series": cache.stack_series is not None,
+        "has_forecast_error_sweeps": cache.forecast_error_sweeps is not None,
+        "stack_index": _stack_index_view(cache),
         "stack_story_steps": STACK_STORY_STEPS,
     }
 
@@ -74,6 +76,7 @@ def render_dashboard(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> None:
     _render_scenarios(st, cache)
     _render_phase5(st, cache)
     _render_stack_index_preview(st, cache, model)
+    _render_forecast_error_sweeps(st, cache)
     _render_data_quality(st, cache)
     _render_sources_and_caveats(st, model)
 
@@ -172,14 +175,21 @@ def _render_stack_index_preview(
 ) -> None:
     if cache.stack_series is None:
         return
-    st.subheader("OpenBESS Stack Index Preview")
+    stack_index = model["stack_index"]
+    st.subheader(stack_index["display_label"])
     st.caption(" | ".join(model["stack_story_steps"]))
+    columns = st.columns(4)
+    columns[0].metric("Primary Window", stack_index["primary_window_label"])
+    columns[1].metric("Coverage", _format_ratio(stack_index["primary_coverage_pct"]))
+    columns[2].metric("Public Eligibility", "yes" if stack_index["public_eligible"] else "no")
+    columns[3].metric("Annualisation", "yes" if stack_index["annualisation_eligible"] else "no")
     columns = [
         "window_label",
         "basis",
         "wholesale_energy_gbp",
         "eac_availability_gbp",
         "degradation_cost_gbp",
+        "cm_annual_scenario_gbp_per_mw_year",
         "degradation_adjusted_value_gbp",
     ]
     available_columns = [column for column in columns if column in cache.stack_series.columns]
@@ -188,6 +198,15 @@ def _render_stack_index_preview(
         hide_index=True,
         use_container_width=True,
     )
+    if stack_index["caveat_flags"]:
+        st.caption("Caveats: " + ", ".join(stack_index["caveat_flags"]))
+
+
+def _render_forecast_error_sweeps(st: Any, cache: DashboardCache) -> None:
+    if cache.forecast_error_sweeps is None or cache.forecast_error_sweeps.empty:
+        return
+    st.subheader("Forecast Error Sensitivities")
+    st.dataframe(cache.forecast_error_sweeps, hide_index=True, use_container_width=True)
 
 
 def _render_data_quality(st: Any, cache: DashboardCache) -> None:
@@ -196,6 +215,8 @@ def _render_data_quality(st: Any, cache: DashboardCache) -> None:
     st.subheader("EAC Commitments and Data Quality")
     if cache.eac_commitments is not None:
         st.dataframe(cache.eac_commitments, hide_index=True, use_container_width=True)
+    if cache.stack_series_windows is not None:
+        st.dataframe(cache.stack_series_windows, hide_index=True, use_container_width=True)
     if cache.data_quality is not None:
         st.json(cache.data_quality)
 
@@ -218,6 +239,32 @@ def _format_currency(value: Any) -> str:
     if value is None:
         return "n/a"
     return f"GBP {float(value):,.0f}"
+
+
+def _stack_index_view(cache: DashboardCache) -> dict[str, Any]:
+    metadata = cache.manifest.get("stack_series", {})
+    windows = []
+    if cache.data_quality is not None:
+        raw_windows = cache.data_quality.get("stack_series_windows", [])
+        if isinstance(raw_windows, list):
+            windows = [window for window in raw_windows if isinstance(window, dict)]
+    primary_window_label = str(metadata.get("primary_window_label", "n/a"))
+    primary_window = next(
+        (window for window in windows if window.get("window_label") == primary_window_label),
+        {},
+    )
+    public_eligible = bool(metadata.get("eligible_for_public_index", False))
+    annualisation_eligible = bool(metadata.get("eligible_for_annualisation", False))
+    return {
+        "display_label": "OpenBESS Stack Index"
+        if public_eligible
+        else "OpenBESS Stack Index Preview",
+        "primary_window_label": primary_window_label,
+        "primary_coverage_pct": primary_window.get("coverage_pct"),
+        "public_eligible": public_eligible,
+        "annualisation_eligible": annualisation_eligible,
+        "caveat_flags": list(metadata.get("caveat_flags", [])),
+    }
 
 
 if __name__ == "__main__":

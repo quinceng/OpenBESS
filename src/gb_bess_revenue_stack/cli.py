@@ -13,6 +13,7 @@ from pydantic import ValidationError
 
 from gb_bess_revenue_stack.commercial import CommercialBessSystem
 from gb_bess_revenue_stack.config.models import AssetConfig
+from gb_bess_revenue_stack.config.reference_assets import load_reference_assets
 from gb_bess_revenue_stack.data.cache import RawCache
 from gb_bess_revenue_stack.data.elexon import ELEXON_BASE_URL, MARKET_INDEX_PATH, ElexonMIDClient
 from gb_bess_revenue_stack.data.manifest import DatasetManifest, ProcessedDatasetWriter
@@ -38,9 +39,17 @@ from gb_bess_revenue_stack.optimisation.market_stack_model import (
 from gb_bess_revenue_stack.optimisation.model_factory import build_energy_dispatch_model
 from gb_bess_revenue_stack.optimisation.results import DispatchResult, extract_dispatch_result
 from gb_bess_revenue_stack.optimisation.solve import solve_dispatch_model
+from gb_bess_revenue_stack.phase4.aligned_cache import (
+    AlignedCacheRequest,
+    fetch_aligned_phase4_cache,
+    load_aligned_phase4_cache,
+    write_aligned_phase4_cache,
+)
 from gb_bess_revenue_stack.phase4.scenarios import (
+    default_phase4_forecast_error_scenarios,
     default_phase4_market_stack_scenarios,
     load_phase4_historical_sample,
+    run_phase4_forecast_error_sweep,
     run_phase4_market_stack_capture_comparison,
     run_phase4_market_stack_sweep,
     run_phase4_smoke_window_comparisons,
@@ -328,6 +337,236 @@ def run_market_stack_smoke(
         f"energy_gbp={market_stack.energy_revenue_gbp:.2f}, "
         f"service_gbp={market_stack.service_revenue_gbp:.2f}, "
         f"cm_annual_gbp={cm_revenue.annual_revenue_gbp:.2f}"
+    )
+
+
+@app.command()
+def build_phase4_aligned_cache(
+    start: Annotated[
+        str,
+        typer.Option(help="UTC start timestamp for the aligned Elexon/NESO window."),
+    ] = "2026-04-01T00:00:00Z",
+    days: Annotated[int, typer.Option(help="Number of calendar days to fetch.")] = 7,
+    provider: Annotated[
+        str,
+        typer.Option(help="Single Elexon MID provider to use for the release cache."),
+    ] = "APXMIDP",
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for aligned source cache JSON files."),
+    ] = Path("results/runs/release_cache/aligned_sources"),
+    neso_page_size: Annotated[
+        int,
+        typer.Option(help="NESO CKAN SQL page size."),
+    ] = 5000,
+) -> None:
+    """Fetch and write an aligned public-source cache for longer Phase 4 runs."""
+
+    if days <= 0:
+        raise typer.BadParameter("days must be positive.")
+    start_utc = parse_source_datetime(start)
+    request = AlignedCacheRequest(
+        start_utc=start_utc,
+        end_utc=start_utc + timedelta(days=days),
+        elexon_provider=provider,
+        neso_page_size=neso_page_size,
+    )
+    cache = fetch_aligned_phase4_cache(request)
+    paths = write_aligned_phase4_cache(cache, output_dir)
+    typer.echo(
+        "Built aligned Phase 4 cache: "
+        f"periods={len(cache.sample.prices)}, "
+        f"hours={cache.sample.sample_hours:.1f}, "
+        f"manifest={paths['aligned_manifest']}"
+    )
+
+
+@app.command()
+def run_release_cache(
+    start: Annotated[
+        str,
+        typer.Option(help="UTC start timestamp if fetching aligned sources."),
+    ] = "2026-04-01T00:00:00Z",
+    days: Annotated[int, typer.Option(help="Number of calendar days to fetch.")] = 7,
+    aligned_cache_dir: Annotated[
+        Path | None,
+        typer.Option(help="Existing aligned source cache directory to reuse."),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for release run outputs."),
+    ] = Path("results/runs/release_cache"),
+    dashboard_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for release dashboard cache outputs."),
+    ] = Path("results/dashboard/release"),
+    provider: Annotated[
+        str,
+        typer.Option(help="Single Elexon MID provider to use when fetching."),
+    ] = "APXMIDP",
+    reference_assets_yaml: Annotated[
+        Path,
+        typer.Option(help="Reference asset registry YAML."),
+    ] = Path("configs/reference_assets.yaml"),
+    asset_id: Annotated[
+        str,
+        typer.Option(help="Reference asset id for the OpenBESS Stack Index run."),
+    ] = "openbess_canonical_1mw_2mwh",
+    finance_assumptions_yaml: Annotated[
+        Path | None,
+        typer.Option(help="Optional YAML file overriding finance assumptions."),
+    ] = Path("configs/finance_assumptions.yaml"),
+    cm_scenarios_yaml: Annotated[
+        Path,
+        typer.Option(help="Capacity Market scenario YAML."),
+    ] = Path("configs/scenarios_cm.yaml"),
+    horizon_periods: Annotated[
+        int,
+        typer.Option(help="Rolling solve horizon in settlement periods."),
+    ] = 48,
+    step_periods: Annotated[
+        int,
+        typer.Option(help="Executed periods per rolling solve."),
+    ] = 48,
+) -> None:
+    """Run a longer cached OpenBESS Stack Index release preview."""
+
+    if days <= 0:
+        raise typer.BadParameter("days must be positive.")
+    if horizon_periods <= 0 or step_periods <= 0:
+        raise typer.BadParameter("horizon_periods and step_periods must be positive.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if aligned_cache_dir is None:
+        start_utc = parse_source_datetime(start)
+        aligned = fetch_aligned_phase4_cache(
+            AlignedCacheRequest(
+                start_utc=start_utc,
+                end_utc=start_utc + timedelta(days=days),
+                elexon_provider=provider,
+            )
+        )
+        aligned_cache_dir = output_dir / "aligned_sources"
+        write_aligned_phase4_cache(aligned, aligned_cache_dir)
+    else:
+        aligned = load_aligned_phase4_cache(aligned_cache_dir)
+
+    sample = aligned.sample
+    registry = load_reference_assets(reference_assets_yaml)
+    reference = registry.assets[asset_id]
+    asset = reference.asset
+    initial_soc_mwh = (asset.soc_min_mwh + cast(float, asset.soc_max_mwh)) / 2
+    rolling_config = RollingConfig(
+        horizon_periods=min(horizon_periods, len(sample.prices)),
+        step_periods=min(step_periods, len(sample.prices)),
+        terminal_soc_policy="target",
+        terminal_soc_target_mwh=initial_soc_mwh,
+    )
+    forecast_model = PreviousDaySamePeriodForecast()
+    rolling_run = run_rolling_market_stack_policy(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=asset,
+        initial_soc_mwh=initial_soc_mwh,
+        forecast_model=forecast_model,
+        config=rolling_config,
+    )
+    capture = run_phase4_market_stack_capture_comparison(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=asset,
+        initial_soc_mwh=initial_soc_mwh,
+        rolling_run=rolling_run,
+        terminal_soc_policy=rolling_config.terminal_soc_policy,  # type: ignore[arg-type]
+        terminal_soc_target_mwh=rolling_config.terminal_soc_target_mwh,
+        solver_config=rolling_config.solver,
+    )
+    smoke_window_comparisons = run_phase4_smoke_window_comparisons(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=asset,
+        initial_soc_mwh=initial_soc_mwh,
+        forecast_model=forecast_model,
+        config=rolling_config,
+        window_day_counts=[1, 2, 7],
+    )
+    sweep = run_phase4_market_stack_sweep(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=asset,
+        initial_soc_mwh=initial_soc_mwh,
+        forecast_model=forecast_model,
+        config=rolling_config,
+        scenarios=default_phase4_market_stack_scenarios(),
+    )
+    forecast_error_results = run_phase4_forecast_error_sweep(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=asset,
+        initial_soc_mwh=initial_soc_mwh,
+        forecast_model=forecast_model,
+        config=rolling_config,
+        scenarios=default_phase4_forecast_error_scenarios(),
+    )
+    cm_label, cm_value = _cm_sidecar_for_asset(
+        cm_scenarios_yaml=cm_scenarios_yaml,
+        asset_duration_hours=reference.cm_duration_hours,
+    )
+    finance_assumptions = load_phase4_finance_assumptions(finance_assumptions_yaml)
+    caveats = [
+        *sample.caveats,
+        "Release cache outputs remain preview-labelled until coverage gates pass.",
+        "Capacity Market value is an annual scenario sidecar.",
+    ]
+    write_phase4_dashboard_cache(
+        Phase4DashboardCacheInput(
+            run_id=f"release_cache_{sample.label}",
+            rolling_run=rolling_run,
+            central_capture=capture,
+            smoke_comparisons=smoke_window_comparisons,
+            scenario_results=sweep.scenario_results,
+            caveats=caveats,
+            config_hash=f"release-cache:{asset_id}:{rolling_config.model_dump_json()}",
+            source_snapshot_hash=sample.source_snapshot_hash,
+            input_run_ids=[sample.label],
+            source_ids=sample.source_ids,
+            source_labels=sample.source_labels,
+            known_at_policy="elexon_mid_delivery_end_and_neso_eac_delivery_start_conservative",
+            battery_energy_capacity_mwh=asset.energy_capacity_mwh,
+            battery_power_mw=asset.power_mw,
+            stack_series_asset_id=asset_id,
+            finance_assumptions=finance_assumptions,
+            cm_annual_scenario_gbp_per_mw_year=cm_value,
+            cm_scenario_label=cm_label,
+            forecast_error_results=forecast_error_results,
+            source_snapshot=aligned.manifest,
+        ),
+        dashboard_dir,
+    )
+    (output_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "sample_label": sample.label,
+                "period_count": len(sample.prices),
+                "sample_hours": sample.sample_hours,
+                "asset_id": asset_id,
+                "rolling_total_revenue_gbp": rolling_run.realised_total_revenue_gbp,
+                "perfect_total_revenue_gbp": capture.perfect_total_revenue_gbp,
+                "capture_ratio": capture.capture_ratio,
+                "dashboard_cache_dir": str(dashboard_dir),
+                "aligned_cache_dir": str(aligned_cache_dir),
+                "cm_scenario_label": cm_label,
+                "cm_annual_scenario_gbp_per_mw_year": cm_value,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    typer.echo(
+        "Built release cache: "
+        f"periods={len(sample.prices)}, "
+        f"rolling_total_gbp={rolling_run.realised_total_revenue_gbp:.2f}, "
+        f"dashboard={dashboard_dir}"
     )
 
 
@@ -718,6 +957,28 @@ def _normalise_stack_series_record(record: dict[str, object]) -> dict[str, objec
     if isinstance(cm_value, float) and math.isnan(cm_value):
         normalised["cm_annual_scenario_gbp_per_mw_year"] = None
     return normalised
+
+
+def _cm_sidecar_for_asset(
+    *,
+    cm_scenarios_yaml: Path,
+    asset_duration_hours: float | None,
+) -> tuple[str | None, float | None]:
+    if asset_duration_hours is None or not cm_scenarios_yaml.is_file():
+        return None, None
+    scenarios = [
+        scenario
+        for scenario in load_cm_scenarios(cm_scenarios_yaml).scenarios
+        if abs(scenario.asset_duration_hours - asset_duration_hours) <= 1e-9
+    ]
+    if not scenarios:
+        return None, None
+    selected = next(
+        (scenario for scenario in scenarios if scenario.auction_type == "T-4"),
+        scenarios[0],
+    )
+    annual_value = selected.derating_factor * selected.clearing_price_gbp_per_kw_year * 1000
+    return selected.scenario_name, annual_value
 
 
 def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:

@@ -8,9 +8,10 @@ from typing import Any, cast
 
 import pandas as pd
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from gb_bess_revenue_stack.phase4.scenarios import (
+    Phase4ForecastErrorSweepResult,
     Phase4MarketStackCaptureResult,
     Phase4SmokeWindowComparison,
 )
@@ -30,6 +31,14 @@ from gb_bess_revenue_stack.schemas.base import ensure_aware_utc
 STACK_WINDOW_LABEL_PRIORITY: dict[str, int] = {
     window.label: index for index, window in enumerate(DEFAULT_STACK_WINDOWS)
 }
+EAC_COMMITMENT_COLUMNS = [
+    "step_index",
+    "decision_time_utc",
+    "service_model_label",
+    "direction",
+    "committed_mw",
+    "executed_period_count",
+]
 
 
 class PublicBenchmarkAnchor(BaseModel):
@@ -99,9 +108,19 @@ class Phase4FinanceAssumptions(BaseModel):
     discount_rate: float = Field(default=0.08, ge=0)
     annual_revenue_decay_rate: float = Field(default=0.02, ge=0, le=1)
     degradation_cost_gbp_per_mwh_throughput: float = Field(default=2.0, ge=0)
+    fixed_om_gbp_per_mw_year: float = Field(default=0.0, ge=0)
+    augmentation_capex_gbp: float | None = Field(default=None, ge=0)
+    augmentation_year: int | None = Field(default=None, ge=1)
     benchmark_anchors: list[PublicBenchmarkAnchor] = Field(
         default_factory=default_public_benchmark_anchors
     )
+
+    @model_validator(mode="after")
+    def augmentation_fields_are_paired(self) -> Phase4FinanceAssumptions:
+        if (self.augmentation_capex_gbp is None) != (self.augmentation_year is None):
+            msg = "augmentation_capex_gbp and augmentation_year must be supplied together."
+            raise ValueError(msg)
+        return self
 
 
 def load_phase4_finance_assumptions(path: str | Path | None = None) -> Phase4FinanceAssumptions:
@@ -158,7 +177,11 @@ class Phase4DashboardCacheInput(BaseModel):
     battery_power_mw: float | None = Field(default=None, gt=0)
     stack_series_asset_id: str = Field(min_length=1)
     capex_gbp: float | None = Field(default=None, ge=0)
+    cm_annual_scenario_gbp_per_mw_year: float | None = Field(default=None, ge=0)
+    cm_scenario_label: str | None = None
     finance_assumptions: Phase4FinanceAssumptions = Field(default_factory=Phase4FinanceAssumptions)
+    forecast_error_results: list[Phase4ForecastErrorSweepResult] = Field(default_factory=list)
+    source_snapshot: dict[str, Any] | None = None
 
     @field_validator("created_at_utc")
     @classmethod
@@ -178,8 +201,11 @@ def write_phase4_dashboard_cache(
         "manifest": cache_dir / "manifest.json",
         "executive_summary": cache_dir / "executive_summary.json",
         "policy_capture": cache_dir / "policy_capture.parquet",
+        "policy_capture_csv": cache_dir / "policy_capture.csv",
         "revenue_stack": cache_dir / "revenue_stack.parquet",
+        "revenue_stack_csv": cache_dir / "revenue_stack.csv",
         "scenario_sweeps": cache_dir / "scenario_sweeps.parquet",
+        "scenario_sweeps_csv": cache_dir / "scenario_sweeps.csv",
         "caveats": cache_dir / "caveats.json",
         "degradation_summary": cache_dir / "degradation_summary.json",
         "finance_summary": cache_dir / "finance_summary.json",
@@ -187,6 +213,12 @@ def write_phase4_dashboard_cache(
         "benchmark_reconciliation": cache_dir / "benchmark_reconciliation.json",
         "eac_commitments": cache_dir / "eac_commitments.parquet",
         "data_quality": cache_dir / "data_quality.json",
+        "data_quality_summary_csv": cache_dir / "data_quality_summary.csv",
+        "stack_series_windows_csv": cache_dir / "stack_series_windows.csv",
+        "forecast_error_sweeps": cache_dir / "forecast_error_sweeps.parquet",
+        "forecast_error_sweeps_csv": cache_dir / "forecast_error_sweeps.csv",
+        "assumptions_ledger": cache_dir / "assumptions_ledger.json",
+        "source_snapshot": cache_dir / "source_snapshot.json",
     }
     degradation = _degradation_summary(payload)
     finance_summary, finance_cashflows = _finance_outputs(payload, degradation)
@@ -195,13 +227,21 @@ def write_phase4_dashboard_cache(
     paths["stack_series_parquet"] = stack_series_paths["parquet"]
     paths["stack_series_csv"] = stack_series_paths["csv"]
 
-    _write_json(paths["manifest"], _manifest(payload, paths))
     _write_json(paths["executive_summary"], _executive_summary(payload))
-    pd.DataFrame(_policy_capture_rows(payload)).to_parquet(paths["policy_capture"], index=False)
-    pd.DataFrame(_revenue_stack_rows(payload)).to_parquet(paths["revenue_stack"], index=False)
-    pd.DataFrame(_scenario_sweep_rows(payload.scenario_results)).to_parquet(
-        paths["scenario_sweeps"],
-        index=False,
+    _write_frame_pair(
+        pd.DataFrame(_policy_capture_rows(payload)),
+        parquet_path=paths["policy_capture"],
+        csv_path=paths["policy_capture_csv"],
+    )
+    _write_frame_pair(
+        pd.DataFrame(_revenue_stack_rows(payload)),
+        parquet_path=paths["revenue_stack"],
+        csv_path=paths["revenue_stack_csv"],
+    )
+    _write_frame_pair(
+        pd.DataFrame(_scenario_sweep_rows(payload.scenario_results)),
+        parquet_path=paths["scenario_sweeps"],
+        csv_path=paths["scenario_sweeps_csv"],
     )
     _write_json(
         paths["caveats"],
@@ -214,22 +254,33 @@ def write_phase4_dashboard_cache(
     _write_json(paths["finance_summary"], finance_summary)
     pd.DataFrame(finance_cashflows).to_parquet(paths["finance_cashflows"], index=False)
     _write_json(paths["benchmark_reconciliation"], benchmark)
-    pd.DataFrame(
-        _eac_commitment_rows(payload),
-        columns=[
-            "step_index",
-            "decision_time_utc",
-            "service_model_label",
-            "direction",
-            "committed_mw",
-            "executed_period_count",
-        ],
-    ).to_parquet(paths["eac_commitments"], index=False)
-    _write_json(paths["data_quality"], _data_quality(payload))
+    pd.DataFrame(_eac_commitment_rows(payload), columns=EAC_COMMITMENT_COLUMNS).to_parquet(
+        paths["eac_commitments"],
+        index=False,
+    )
+    data_quality = _data_quality(payload)
+    _write_json(paths["data_quality"], data_quality)
+    pd.DataFrame(_data_quality_summary_rows(data_quality)).to_csv(
+        paths["data_quality_summary_csv"],
+        index=False,
+    )
+    pd.DataFrame(data_quality["stack_series_windows"]).to_csv(
+        paths["stack_series_windows_csv"],
+        index=False,
+    )
+    _write_frame_pair(
+        pd.DataFrame(_forecast_error_rows(payload.forecast_error_results)),
+        parquet_path=paths["forecast_error_sweeps"],
+        csv_path=paths["forecast_error_sweeps_csv"],
+    )
+    _write_json(paths["assumptions_ledger"], _assumptions_ledger(payload))
+    _write_json(paths["source_snapshot"], payload.source_snapshot or _source_snapshot(payload))
+    _write_json(paths["manifest"], _manifest(payload, paths))
     return paths
 
 
 def _manifest(payload: Phase4DashboardCacheInput, paths: dict[str, Path]) -> dict[str, Any]:
+    stack_window = _primary_stack_series_window(payload)
     return {
         "run_id": payload.run_id,
         "created_at_utc": payload.created_at_utc.isoformat(),
@@ -245,6 +296,14 @@ def _manifest(payload: Phase4DashboardCacheInput, paths: dict[str, Path]) -> dic
         "degradation_treatment": payload.degradation_treatment,
         "central_or_sensitivity": payload.central_or_sensitivity,
         "refresh_cadence": payload.refresh_cadence,
+        "stack_series": {
+            "schema_version": payload.schema_version,
+            "row_count": 2,
+            "primary_window_label": stack_window["window_label"],
+            "eligible_for_public_index": stack_window["eligible_for_public_index"],
+            "eligible_for_annualisation": stack_window["eligible_for_annualisation"],
+            "caveat_flags": stack_window["caveat_flags"],
+        },
         "files": {key: path.name for key, path in paths.items() if key != "manifest"},
     }
 
@@ -270,9 +329,21 @@ def _executive_summary(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
         "source_labels": payload.source_labels,
         "links": {
             "policy_capture": "policy_capture.parquet",
+            "policy_capture_csv": "policy_capture.csv",
             "revenue_stack": "revenue_stack.parquet",
+            "revenue_stack_csv": "revenue_stack.csv",
             "scenario_sweeps": "scenario_sweeps.parquet",
+            "scenario_sweeps_csv": "scenario_sweeps.csv",
             "caveats": "caveats.json",
+            "stack_series": "stack_series.parquet",
+            "stack_series_csv": "stack_series.csv",
+            "forecast_error_sweeps": "forecast_error_sweeps.parquet",
+            "forecast_error_sweeps_csv": "forecast_error_sweeps.csv",
+            "data_quality": "data_quality.json",
+            "data_quality_summary_csv": "data_quality_summary.csv",
+            "stack_series_windows_csv": "stack_series_windows.csv",
+            "source_snapshot": "source_snapshot.json",
+            "assumptions_ledger": "assumptions_ledger.json",
         },
     }
 
@@ -308,38 +379,55 @@ def _capture_row(label: str, capture: Phase4MarketStackCaptureResult) -> dict[st
 
 def _revenue_stack_rows(payload: Phase4DashboardCacheInput) -> list[dict[str, Any]]:
     central = payload.central_capture
-    return [
+    rows: list[dict[str, Any]] = [
         {
             "basis": "perfect_foresight",
             "component": "wholesale_energy",
             "value_gbp": central.perfect_energy_revenue_gbp,
+            "value_gbp_per_mw_year": None,
         },
         {
             "basis": "perfect_foresight",
             "component": "eac_availability",
             "value_gbp": central.perfect_service_revenue_gbp,
+            "value_gbp_per_mw_year": None,
         },
         {
             "basis": "perfect_foresight",
             "component": "total",
             "value_gbp": central.perfect_total_revenue_gbp,
+            "value_gbp_per_mw_year": None,
         },
         {
             "basis": "rolling_policy",
             "component": "wholesale_energy",
             "value_gbp": central.rolling_energy_revenue_gbp,
+            "value_gbp_per_mw_year": None,
         },
         {
             "basis": "rolling_policy",
             "component": "eac_availability",
             "value_gbp": central.rolling_service_revenue_gbp,
+            "value_gbp_per_mw_year": None,
         },
         {
             "basis": "rolling_policy",
             "component": "total",
             "value_gbp": central.rolling_total_revenue_gbp,
+            "value_gbp_per_mw_year": None,
         },
     ]
+    if payload.cm_annual_scenario_gbp_per_mw_year is not None:
+        rows.append(
+            {
+                "basis": "scenario",
+                "component": "capacity_market_annual",
+                "value_gbp": None,
+                "value_gbp_per_mw_year": payload.cm_annual_scenario_gbp_per_mw_year,
+                "scenario_label": payload.cm_scenario_label,
+            }
+        )
+    return rows
 
 
 def _scenario_sweep_rows(
@@ -398,6 +486,9 @@ def _finance_outputs(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     assumptions = payload.finance_assumptions
     annualisation_eligible = _annualisation_eligible(payload)
+    if assumptions.fixed_om_gbp_per_mw_year > 0 and payload.battery_power_mw is None:
+        msg = "battery_power_mw is required when fixed O&M is configured per MW."
+        raise ValueError(msg)
     capex = payload.capex_gbp or 0.0
     rows: list[dict[str, Any]] = []
     cumulative = -capex
@@ -405,7 +496,11 @@ def _finance_outputs(
         {
             "year": 0,
             "gross_revenue_gbp": 0.0,
+            "market_revenue_gbp": 0.0,
+            "capacity_market_revenue_gbp": 0.0,
             "degradation_cost_gbp": 0.0,
+            "fixed_om_gbp": 0.0,
+            "augmentation_capex_gbp": 0.0,
             "net_cashflow_gbp": -capex,
             "discount_factor": 1.0,
             "discounted_cashflow_gbp": -capex,
@@ -423,8 +518,11 @@ def _finance_outputs(
                 "capex_gbp": capex,
                 "annualised_rolling_revenue_gbp": None,
                 "annualised_degradation_cost_gbp": None,
+                "annual_fixed_om_gbp": None,
+                "annual_capacity_market_revenue_gbp": None,
                 "npv_gbp": None,
                 "simple_payback_year": None,
+                "payback_definition": "first year cumulative undiscounted cashflow is non-negative",
                 "finance_years": assumptions.finance_years,
                 "discount_rate": assumptions.discount_rate,
                 "annual_revenue_decay_rate": assumptions.annual_revenue_decay_rate,
@@ -445,19 +543,38 @@ def _finance_outputs(
         if payload.central_capture.sample_hours > 0
         else 0.0
     )
-    annual_revenue = payload.central_capture.rolling_total_revenue_gbp * annualisation_factor
+    annual_market_revenue = payload.central_capture.rolling_total_revenue_gbp * annualisation_factor
+    annual_cm_revenue = (
+        0.0
+        if payload.cm_annual_scenario_gbp_per_mw_year is None or payload.battery_power_mw is None
+        else payload.cm_annual_scenario_gbp_per_mw_year * payload.battery_power_mw
+    )
+    annual_fixed_om = assumptions.fixed_om_gbp_per_mw_year * (payload.battery_power_mw or 0.0)
     annual_degradation_cost = float(degradation["degradation_cost_gbp"]) * annualisation_factor
 
     for year in range(1, assumptions.finance_years + 1):
-        gross = annual_revenue * (1 - assumptions.annual_revenue_decay_rate) ** (year - 1)
-        net = gross - annual_degradation_cost
+        market_revenue = annual_market_revenue * (1 - assumptions.annual_revenue_decay_rate) ** (
+            year - 1
+        )
+        gross = market_revenue + annual_cm_revenue
+        augmentation_capex = (
+            assumptions.augmentation_capex_gbp
+            if assumptions.augmentation_year == year
+            and assumptions.augmentation_capex_gbp is not None
+            else 0.0
+        )
+        net = gross - annual_degradation_cost - annual_fixed_om - augmentation_capex
         cumulative += net
         discount_factor = 1 / (1 + assumptions.discount_rate) ** year
         rows.append(
             {
                 "year": year,
                 "gross_revenue_gbp": gross,
+                "market_revenue_gbp": market_revenue,
+                "capacity_market_revenue_gbp": annual_cm_revenue,
                 "degradation_cost_gbp": annual_degradation_cost,
+                "fixed_om_gbp": annual_fixed_om,
+                "augmentation_capex_gbp": augmentation_capex,
                 "net_cashflow_gbp": net,
                 "discount_factor": discount_factor,
                 "discounted_cashflow_gbp": net * discount_factor,
@@ -477,10 +594,14 @@ def _finance_outputs(
                 "substitute for commercial due diligence."
             ),
             "capex_gbp": capex,
-            "annualised_rolling_revenue_gbp": annual_revenue,
+            "annualised_rolling_revenue_gbp": annual_market_revenue,
             "annualised_degradation_cost_gbp": annual_degradation_cost,
+            "annual_fixed_om_gbp": annual_fixed_om,
+            "annual_capacity_market_revenue_gbp": annual_cm_revenue,
+            "cm_scenario_label": payload.cm_scenario_label,
             "npv_gbp": npv,
             "simple_payback_year": payback_year,
+            "payback_definition": "first year cumulative undiscounted cashflow is non-negative",
             "finance_years": assumptions.finance_years,
             "discount_rate": assumptions.discount_rate,
             "annual_revenue_decay_rate": assumptions.annual_revenue_decay_rate,
@@ -585,7 +706,7 @@ def _stack_series_rows(
             wholesale_energy_gbp=central.perfect_energy_revenue_gbp,
             eac_availability_gbp=central.perfect_service_revenue_gbp,
             degradation_cost_gbp=0,
-            cm_annual_scenario_gbp_per_mw_year=None,
+            cm_annual_scenario_gbp_per_mw_year=payload.cm_annual_scenario_gbp_per_mw_year,
             caveat_flags=caveat_flags,
         ),
         StackSeriesRow(
@@ -596,7 +717,7 @@ def _stack_series_rows(
             wholesale_energy_gbp=central.rolling_energy_revenue_gbp,
             eac_availability_gbp=central.rolling_service_revenue_gbp,
             degradation_cost_gbp=float(degradation["degradation_cost_gbp"]),
-            cm_annual_scenario_gbp_per_mw_year=None,
+            cm_annual_scenario_gbp_per_mw_year=payload.cm_annual_scenario_gbp_per_mw_year,
             caveat_flags=caveat_flags,
         ),
     ]
@@ -712,6 +833,64 @@ def _annualisation_eligible(payload: Phase4DashboardCacheInput) -> bool:
     return any(
         window["eligible_for_annualisation"] for window in _stack_series_window_eligibility(payload)
     )
+
+
+def _forecast_error_rows(
+    results: list[Phase4ForecastErrorSweepResult],
+) -> list[dict[str, Any]]:
+    return [result.model_dump(mode="json") for result in results]
+
+
+def _data_quality_summary_rows(data_quality: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "run_id": data_quality["run_id"],
+            "price_period_count": data_quality["price_period_count"],
+            "solver_failure_count": data_quality["solver_failure_count"],
+            "excluded_future_row_count": data_quality["excluded_future_row_count"],
+            "service_cell_count": data_quality["service_cell_count"],
+            "excluded_service_cell_count": data_quality["excluded_service_cell_count"],
+            "caveat_count": data_quality["caveat_count"],
+        }
+    ]
+
+
+def _assumptions_ledger(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
+    return {
+        "asset": {
+            "asset_id": payload.stack_series_asset_id,
+            "battery_energy_capacity_mwh": payload.battery_energy_capacity_mwh,
+            "battery_power_mw": payload.battery_power_mw,
+        },
+        "finance": payload.finance_assumptions.model_dump(
+            mode="json",
+            exclude={"benchmark_anchors"},
+        ),
+        "capacity_market": {
+            "cm_scenario_label": payload.cm_scenario_label,
+            "cm_annual_scenario_gbp_per_mw_year": (payload.cm_annual_scenario_gbp_per_mw_year),
+            "treatment": "annual sidecar, not settlement-period dispatch revenue",
+        },
+        "known_at_policy": payload.known_at_policy,
+        "degradation_treatment": payload.degradation_treatment,
+        "licence_caveat_flags": payload.licence_caveat_flags,
+    }
+
+
+def _source_snapshot(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
+    return {
+        "source_ids": payload.source_ids,
+        "source_labels": payload.source_labels,
+        "source_snapshot_hash": payload.source_snapshot_hash,
+        "input_run_ids": payload.input_run_ids,
+        "known_at_policy": payload.known_at_policy,
+        "created_at_utc": payload.created_at_utc.isoformat(),
+    }
+
+
+def _write_frame_pair(frame: pd.DataFrame, *, parquet_path: Path, csv_path: Path) -> None:
+    frame.to_parquet(parquet_path, index=False)
+    frame.to_csv(csv_path, index=False)
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:

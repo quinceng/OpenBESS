@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -16,6 +17,7 @@ from gb_bess_revenue_stack.schemas.market import EACAuctionResult
 
 NESO_CKAN_ACTION_BASE_URL = "https://api.neso.energy/api/3/action"
 EAC_RESULTS_SUMMARY_RESOURCE_ID = "596f29ac-0387-4ba4-a6d3-95c243140707"
+RESOURCE_ID_RE = re.compile(r"^[A-Za-z0-9-]+$")
 
 
 PRODUCT_MAP: dict[str, tuple[str, str]] = {
@@ -61,20 +63,86 @@ class NESOEACClient:
         self,
         *,
         limit: int = 100,
+        offset: int = 0,
         resource_id: str = EAC_RESULTS_SUMMARY_RESOURCE_ID,
     ) -> list[dict[str, Any]]:
         if limit <= 0:
             msg = "limit must be positive."
             raise ValueError(msg)
+        if offset < 0:
+            msg = "offset must be non-negative."
+            raise ValueError(msg)
         response = self.http_client.get(
             f"{self.action_base_url}/datastore_search",
-            params={"resource_id": resource_id, "limit": str(limit)},
+            params={"resource_id": resource_id, "limit": str(limit), "offset": str(offset)},
         )
         response.raise_for_status()
         payload = response.json()
         records = payload.get("result", {}).get("records", [])
         if not isinstance(records, list):
             msg = "NESO datastore response did not contain a records list."
+            raise ValueError(msg)
+        return [dict(record) for record in records]
+
+    @retry(wait=wait_exponential(multiplier=0.25, max=2), stop=stop_after_attempt(3), reraise=True)
+    def fetch_summary_records_for_window(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        page_size: int = 5000,
+        resource_id: str = EAC_RESULTS_SUMMARY_RESOURCE_ID,
+    ) -> list[dict[str, Any]]:
+        start = ensure_aware_utc(start)
+        end = ensure_aware_utc(end)
+        if end <= start:
+            msg = "end must be after start."
+            raise ValueError(msg)
+        if page_size <= 0:
+            msg = "page_size must be positive."
+            raise ValueError(msg)
+        _validate_resource_id(resource_id)
+
+        records: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = self._fetch_summary_records_for_window_page(
+                start=start,
+                end=end,
+                page_size=page_size,
+                offset=offset,
+                resource_id=resource_id,
+            )
+            records.extend(page)
+            if len(page) < page_size:
+                return records
+            offset += page_size
+
+    def _fetch_summary_records_for_window_page(
+        self,
+        *,
+        start: datetime,
+        end: datetime,
+        page_size: int,
+        offset: int,
+        resource_id: str,
+    ) -> list[dict[str, Any]]:
+        sql = _window_sql(
+            resource_id=resource_id,
+            start=start,
+            end=end,
+            limit=page_size,
+            offset=offset,
+        )
+        response = self.http_client.get(
+            f"{self.action_base_url}/datastore_search_sql",
+            params={"sql": sql},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        records = payload.get("result", {}).get("records", [])
+        if not isinstance(records, list):
+            msg = "NESO SQL datastore response did not contain a records list."
             raise ValueError(msg)
         return [dict(record) for record in records]
 
@@ -139,3 +207,31 @@ def _optional_str(value: object) -> str | None:
     if text == "":
         return None
     return text
+
+
+def _window_sql(
+    *,
+    resource_id: str,
+    start: datetime,
+    end: datetime,
+    limit: int,
+    offset: int,
+) -> str:
+    _validate_resource_id(resource_id)
+    return (
+        f'SELECT * from "{resource_id}" '
+        f"WHERE \"deliveryEnd\" > '{_format_sql_time(start)}' "
+        f"AND \"deliveryStart\" < '{_format_sql_time(end)}' "
+        'ORDER BY "deliveryStart", "auctionProduct", "auctionID" '
+        f"LIMIT {limit} OFFSET {offset}"
+    )
+
+
+def _validate_resource_id(resource_id: str) -> None:
+    if RESOURCE_ID_RE.match(resource_id) is None:
+        msg = "resource_id must contain only letters, numbers and hyphens."
+        raise ValueError(msg)
+
+
+def _format_sql_time(value: datetime) -> str:
+    return ensure_aware_utc(value).isoformat(timespec="seconds").replace("+00:00", "")

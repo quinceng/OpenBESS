@@ -42,14 +42,23 @@ Suggested cache files:
 results/dashboard/manifest.json
 results/dashboard/executive_summary.json
 results/dashboard/revenue_stack.parquet
+results/dashboard/revenue_stack.csv
 results/dashboard/policy_capture.parquet
+results/dashboard/policy_capture.csv
 results/dashboard/eac_commitments.parquet
 results/dashboard/scenario_sweeps.parquet
+results/dashboard/scenario_sweeps.csv
 results/dashboard/finance_cashflows.parquet
 results/dashboard/stack_series.parquet
 results/dashboard/stack_series.csv
+results/dashboard/forecast_error_sweeps.parquet
+results/dashboard/forecast_error_sweeps.csv
 results/dashboard/benchmark_reconciliation.json
 results/dashboard/data_quality.json
+results/dashboard/data_quality_summary.csv
+results/dashboard/stack_series_windows.csv
+results/dashboard/assumptions_ledger.json
+results/dashboard/source_snapshot.json
 results/dashboard/caveats.json
 ```
 
@@ -60,16 +69,25 @@ explainer:
 results/dashboard/manifest.json
 results/dashboard/executive_summary.json
 results/dashboard/revenue_stack.parquet
+results/dashboard/revenue_stack.csv
 results/dashboard/policy_capture.parquet
+results/dashboard/policy_capture.csv
 results/dashboard/scenario_sweeps.parquet
+results/dashboard/scenario_sweeps.csv
 results/dashboard/degradation_summary.json
 results/dashboard/finance_summary.json
 results/dashboard/finance_cashflows.parquet
 results/dashboard/stack_series.parquet
 results/dashboard/stack_series.csv
+results/dashboard/forecast_error_sweeps.parquet
+results/dashboard/forecast_error_sweeps.csv
 results/dashboard/benchmark_reconciliation.json
 results/dashboard/eac_commitments.parquet
 results/dashboard/data_quality.json
+results/dashboard/data_quality_summary.csv
+results/dashboard/stack_series_windows.csv
+results/dashboard/assumptions_ledger.json
+results/dashboard/source_snapshot.json
 results/dashboard/caveats.json
 ```
 
@@ -82,6 +100,16 @@ cell coverage.
 Preview series from the same dataframe. The CSV export serialises
 `caveat_flags` as JSON text. Both exports contain row-level stack values and
 must preserve `not_a_market_index`.
+
+`forecast_error_sweeps.parquet` and `forecast_error_sweeps.csv` record
+deterministic rolling-policy sensitivities for biased or scaled wholesale
+forecasts. These rows are diagnostics for forecast imperfection and are not
+headline market values.
+
+`assumptions_ledger.json` records the asset, finance, Capacity Market,
+known-at and caveat assumptions used by the cache. `source_snapshot.json`
+records the source IDs, labels, snapshot hash and input run IDs. Release runs
+may pass a richer aligned-source manifest through to `source_snapshot.json`.
 
 The row `asset_id` identifies the asset actually solved in the cache.
 `openbess_canonical_1mw_2mwh` is only valid for canonical reference runs, not
@@ -147,7 +175,14 @@ manual rebuild before public release
 
 Scheduled refresh is out of scope until source clients, licences and runtime budgets are stable.
 
-## 8. Tests
+## 8. Release Cache Commands
+
+Use `uv run gb-bess build-phase4-aligned-cache` to fetch aligned Elexon MID and
+NESO EAC source JSON for a requested window. The default is a seven-day release
+preview. Use `uv run gb-bess run-release-cache` to run the cached OpenBESS Stack
+Index preview and write the dashboard artefacts.
+
+## 9. Tests
 
 Dashboard tests should verify:
 

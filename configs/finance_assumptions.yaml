@@ -2,6 +2,9 @@ finance_years: 15
 discount_rate: 0.08
 annual_revenue_decay_rate: 0.02
 degradation_cost_gbp_per_mwh_throughput: 2.0
+fixed_om_gbp_per_mw_year: 0.0
+augmentation_capex_gbp: null
+augmentation_year: null
 benchmark_anchors:
   - benchmark_label: Modo GB BESS 2024 average
     source_id: PUBLIC_BENCHMARK_ANCHORS

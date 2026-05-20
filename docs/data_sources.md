@@ -79,6 +79,12 @@ Required Phase 1 checks:
 
 Central EAC products should be the smallest verified set. If only one product is robustly verified, Release 1 should use one product rather than overclaim a full service suite.
 
+Longer release caches use an aligned Elexon and NESO delivery window. Elexon
+MID rows are filtered to one provider and to settlement starts inside the
+requested interval. NESO EAC rows are queried by delivery-window overlap and
+paginated. Missing EAC cells in release mode are exposed as data-quality
+caveats rather than hidden by backfilling.
+
 ## 4. EAC Rules and Timing
 
 Intended sources:

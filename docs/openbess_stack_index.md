@@ -99,13 +99,25 @@ The published artefacts for the dashboard and release bundle may include:
 
 - `stack_series.parquet`;
 - `stack_series.csv`;
+- `revenue_stack.parquet` and `revenue_stack.csv`;
+- `policy_capture.parquet` and `policy_capture.csv`;
+- `forecast_error_sweeps.parquet` and `forecast_error_sweeps.csv`;
 - dashboard manifest and caveats;
 - window eligibility metadata;
 - reference-asset metadata;
+- finance and Capacity Market assumptions ledger;
 - source snapshot and known-at policy metadata.
 
 The CSV and parquet exports must be generated from the same dataframe. CSV
 serialises list-like caveat fields such as `caveat_flags` as JSON strings.
+
+The Capacity Market value is a per MW per year scenario sidecar. It is carried
+in stack-series rows and finance outputs, but it does not enter settlement
+period optimisation or dispatch revenue.
+
+Forecast error sweeps show how rolling-policy value changes when wholesale
+forecasts are biased or scaled. They are sensitivity rows and should not be
+presented as a separate market component.
 
 ## Non-Claims
 

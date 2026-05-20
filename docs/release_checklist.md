@@ -36,6 +36,8 @@ Use this checklist before publishing Release 1.
 - Raw and processed data policy is documented.
 - Tiny fixtures exist where licence permits.
 - Phase 4 default smoke sample is historical and aligned across Elexon MID and NESO EAC rows.
+- Longer aligned cache is rebuilt with `uv run gb-bess build-phase4-aligned-cache`.
+- Release dashboard cache is rebuilt with `uv run gb-bess run-release-cache`.
 - Short Phase 4 smoke windows record explicit skipped-window reasons.
 - Default Phase 4 fixture hash is pinned in unit tests; fixture edits must update the digest intentionally.
 - DST tests pass.
@@ -68,6 +70,7 @@ Use this checklist before publishing Release 1.
 - NPV hand-calculation tests pass.
 - CM counted once per year.
 - Derating source and delivery year are visible.
+- Fixed O&M and augmentation assumptions are visible in the assumptions ledger.
 - Excluded finance items are shown in dashboard or README.
 - Outputs say scenario appraisal, not bankability.
 
@@ -92,6 +95,8 @@ Use this checklist before publishing Release 1.
 - OpenBESS Stack Index outputs use preview labelling unless coverage gates pass.
 - Manifest and caveats include `not_a_market_index` for named OpenBESS outputs.
 - `stack_series.csv` and `stack_series.parquet` are generated from the same dataframe.
+- Forecast error sweeps are included as diagnostics where a release cache has enough rows to run them.
+- Source snapshot and assumptions ledger files are present.
 
 ## 10. Documentation
 

@@ -7,7 +7,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gb_bess_revenue_stack.phase4.scenarios import Phase4MarketStackCaptureResult
+from gb_bess_revenue_stack.phase4.scenarios import (
+    Phase4ForecastErrorSweepResult,
+    Phase4MarketStackCaptureResult,
+)
 from gb_bess_revenue_stack.policies.rolling_market_stack import (
     RollingMarketStackRun,
     RollingMarketStackScenarioResult,
@@ -34,19 +37,40 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert (tmp_path / "benchmark_reconciliation.json").exists()
     assert (tmp_path / "eac_commitments.parquet").exists()
     assert (tmp_path / "data_quality.json").exists()
+    assert (tmp_path / "policy_capture.csv").exists()
+    assert (tmp_path / "revenue_stack.csv").exists()
+    assert (tmp_path / "scenario_sweeps.csv").exists()
+    assert (tmp_path / "data_quality_summary.csv").exists()
+    assert (tmp_path / "stack_series_windows.csv").exists()
+    assert (tmp_path / "forecast_error_sweeps.parquet").exists()
+    assert (tmp_path / "forecast_error_sweeps.csv").exists()
+    assert (tmp_path / "assumptions_ledger.json").exists()
+    assert (tmp_path / "source_snapshot.json").exists()
     assert (tmp_path / "stack_series.parquet").exists()
     assert (tmp_path / "stack_series.csv").exists()
     assert paths["stack_series_parquet"] == tmp_path / "stack_series.parquet"
     assert paths["stack_series_csv"] == tmp_path / "stack_series.csv"
 
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    executive_summary = json.loads(
+        (tmp_path / "executive_summary.json").read_text(encoding="utf-8")
+    )
     assert manifest["files"]["degradation_summary"] == "degradation_summary.json"
     assert manifest["files"]["finance_cashflows"] == "finance_cashflows.parquet"
     assert manifest["files"]["benchmark_reconciliation"] == "benchmark_reconciliation.json"
     assert manifest["files"]["eac_commitments"] == "eac_commitments.parquet"
     assert manifest["files"]["data_quality"] == "data_quality.json"
+    assert manifest["files"]["data_quality_summary_csv"] == "data_quality_summary.csv"
+    assert manifest["files"]["stack_series_windows_csv"] == "stack_series_windows.csv"
+    assert manifest["files"]["forecast_error_sweeps"] == "forecast_error_sweeps.parquet"
+    assert manifest["files"]["forecast_error_sweeps_csv"] == "forecast_error_sweeps.csv"
+    assert manifest["files"]["assumptions_ledger"] == "assumptions_ledger.json"
+    assert manifest["files"]["source_snapshot"] == "source_snapshot.json"
     assert manifest["files"]["stack_series_parquet"] == "stack_series.parquet"
     assert manifest["files"]["stack_series_csv"] == "stack_series.csv"
+    assert manifest["stack_series"]["row_count"] == 2
+    assert executive_summary["links"]["forecast_error_sweeps"] == ("forecast_error_sweeps.parquet")
+    assert executive_summary["links"]["data_quality_summary_csv"] == "data_quality_summary.csv"
     assert "not_a_market_index" in manifest["licence_caveat_flags"]
     assert "partial_sample_annualised" not in manifest["licence_caveat_flags"]
 
@@ -119,6 +143,59 @@ def test_phase5_finance_outputs_match_hand_calculated_npv_and_payback(
         0
     ] == pytest.approx(600 / 1.1)
     assert finance["finance_assumptions"]["discount_rate"] == pytest.approx(0.10)
+
+
+def test_phase5_cache_populates_cm_sidecar_and_finance_components(tmp_path: Path) -> None:
+    assumptions = Phase4FinanceAssumptions(
+        finance_years=3,
+        discount_rate=0,
+        annual_revenue_decay_rate=0,
+        degradation_cost_gbp_per_mwh_throughput=0,
+        fixed_om_gbp_per_mw_year=1_000,
+        augmentation_capex_gbp=500,
+        augmentation_year=2,
+        benchmark_anchors=[],
+    )
+    payload = _phase5_payload().model_copy(
+        update={
+            "capex_gbp": 1_000,
+            "finance_assumptions": assumptions,
+            "cm_annual_scenario_gbp_per_mw_year": 12_000,
+            "cm_scenario_label": "cm_case",
+        }
+    )
+    payload.central_capture.price_period_count = 90 * 48
+    payload.central_capture.sample_hours = 90 * 24
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    stack_series = pd.read_parquet(tmp_path / "stack_series.parquet")
+    revenue_stack = pd.read_parquet(tmp_path / "revenue_stack.parquet")
+    finance = json.loads((tmp_path / "finance_summary.json").read_text(encoding="utf-8"))
+    cashflows = pd.read_parquet(tmp_path / "finance_cashflows.parquet")
+    assumptions_ledger = json.loads(
+        (tmp_path / "assumptions_ledger.json").read_text(encoding="utf-8")
+    )
+
+    assert stack_series["cm_annual_scenario_gbp_per_mw_year"].tolist() == [
+        pytest.approx(12_000),
+        pytest.approx(12_000),
+    ]
+    assert revenue_stack.loc[
+        revenue_stack["component"] == "capacity_market_annual",
+        "value_gbp_per_mw_year",
+    ].iloc[0] == pytest.approx(12_000)
+    assert finance["annualisation_eligible"] is True
+    assert finance["annual_capacity_market_revenue_gbp"] == pytest.approx(12_000)
+    assert finance["annual_fixed_om_gbp"] == pytest.approx(1_000)
+    assert finance["cm_scenario_label"] == "cm_case"
+    assert cashflows.loc[cashflows["year"] == 1, "fixed_om_gbp"].iloc[0] == pytest.approx(1_000)
+    assert cashflows.loc[cashflows["year"] == 2, "augmentation_capex_gbp"].iloc[0] == pytest.approx(
+        500
+    )
+    assert assumptions_ledger["capacity_market"]["treatment"] == (
+        "annual sidecar, not settlement-period dispatch revenue"
+    )
 
 
 def test_phase5_finance_assumptions_load_from_yaml(tmp_path: Path) -> None:
@@ -272,6 +349,38 @@ def test_phase5_cache_writes_stack_series_rows_for_central_aggregate(
     assert rolling["eac_availability_gbp"] == pytest.approx(50)
     assert rolling["degradation_cost_gbp"] == pytest.approx(4)
     assert rolling["degradation_adjusted_value_gbp"] == pytest.approx(200 + 50 - 4)
+
+
+def test_phase5_cache_writes_forecast_error_sweeps(tmp_path: Path) -> None:
+    payload = _phase5_payload().model_copy(
+        update={
+            "forecast_error_results": [
+                Phase4ForecastErrorSweepResult(
+                    name="price_underforecast_10pct",
+                    forecast_model="previous_day_same_period:under",
+                    period_count=4,
+                    price_scalar=0.9,
+                    price_bias_gbp_per_mwh=0,
+                    forecast_mae_gbp_per_mwh=12,
+                    forecast_rmse_gbp_per_mwh=15,
+                    rolling_energy_revenue_gbp=190,
+                    rolling_service_revenue_gbp=45,
+                    rolling_total_revenue_gbp=235,
+                    capture_ratio=0.78,
+                    final_soc_mwh=1,
+                )
+            ]
+        }
+    )
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    forecast_error = pd.read_parquet(tmp_path / "forecast_error_sweeps.parquet")
+    forecast_error_csv = pd.read_csv(tmp_path / "forecast_error_sweeps.csv")
+
+    assert forecast_error["name"].tolist() == ["price_underforecast_10pct"]
+    assert forecast_error["rolling_total_revenue_gbp"].iloc[0] == pytest.approx(235)
+    assert forecast_error_csv["price_scalar"].iloc[0] == pytest.approx(0.9)
 
 
 def _phase5_payload() -> Phase4DashboardCacheInput:

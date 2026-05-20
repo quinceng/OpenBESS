@@ -26,6 +26,12 @@ OPTIONAL_FILES = {
     "eac_commitments": "eac_commitments.parquet",
     "data_quality": "data_quality.json",
     "stack_series": "stack_series.parquet",
+    "stack_series_csv": "stack_series.csv",
+    "stack_series_windows": "stack_series_windows.csv",
+    "forecast_error_sweeps": "forecast_error_sweeps.parquet",
+    "data_quality_summary": "data_quality_summary.csv",
+    "assumptions_ledger": "assumptions_ledger.json",
+    "source_snapshot": "source_snapshot.json",
 }
 
 STACK_SERIES_REQUIRED_COLUMNS = {
@@ -65,6 +71,11 @@ class DashboardCache:
     eac_commitments: pd.DataFrame | None = None
     data_quality: dict[str, Any] | None = None
     stack_series: pd.DataFrame | None = None
+    stack_series_windows: pd.DataFrame | None = None
+    forecast_error_sweeps: pd.DataFrame | None = None
+    data_quality_summary: pd.DataFrame | None = None
+    assumptions_ledger: dict[str, Any] | None = None
+    source_snapshot: dict[str, Any] | None = None
 
 
 def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> DashboardCache:
@@ -80,9 +91,14 @@ def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Dashboard
         )
         raise DashboardCacheError(msg)
     try:
+        manifest = _read_json(root / REQUIRED_FILES["manifest"])
+        stack_series = _read_optional_stack_series(
+            root=root,
+            manifest=manifest,
+        )
         return DashboardCache(
             cache_dir=root,
-            manifest=_read_json(root / REQUIRED_FILES["manifest"]),
+            manifest=manifest,
             executive_summary=_read_json(root / REQUIRED_FILES["executive_summary"]),
             policy_capture=pd.read_parquet(root / REQUIRED_FILES["policy_capture"]),
             revenue_stack=pd.read_parquet(root / REQUIRED_FILES["revenue_stack"]),
@@ -96,7 +112,14 @@ def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Dashboard
             ),
             eac_commitments=_read_optional_parquet(root / OPTIONAL_FILES["eac_commitments"]),
             data_quality=_read_optional_json(root / OPTIONAL_FILES["data_quality"]),
-            stack_series=_read_optional_stack_series(root / OPTIONAL_FILES["stack_series"]),
+            stack_series=stack_series,
+            stack_series_windows=_read_optional_csv(root / OPTIONAL_FILES["stack_series_windows"]),
+            forecast_error_sweeps=_read_optional_parquet(
+                root / OPTIONAL_FILES["forecast_error_sweeps"]
+            ),
+            data_quality_summary=_read_optional_csv(root / OPTIONAL_FILES["data_quality_summary"]),
+            assumptions_ledger=_read_optional_json(root / OPTIONAL_FILES["assumptions_ledger"]),
+            source_snapshot=_read_optional_json(root / OPTIONAL_FILES["source_snapshot"]),
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         msg = f"Dashboard cache at {root} could not be read: {exc}"
@@ -119,10 +142,29 @@ def _read_optional_parquet(path: Path) -> pd.DataFrame | None:
     return pd.read_parquet(path) if path.is_file() else None
 
 
-def _read_optional_stack_series(path: Path) -> pd.DataFrame | None:
-    frame = _read_optional_parquet(path)
+def _read_optional_csv(path: Path) -> pd.DataFrame | None:
+    return pd.read_csv(path) if path.is_file() else None
+
+
+def _read_optional_stack_series(*, root: Path, manifest: dict[str, Any]) -> pd.DataFrame | None:
+    files = manifest.get("files", {})
+    advertised_parquet = isinstance(files, dict) and "stack_series_parquet" in files
+    advertised_csv = isinstance(files, dict) and "stack_series_csv" in files
+    parquet_path = root / OPTIONAL_FILES["stack_series"]
+    csv_path = root / OPTIONAL_FILES["stack_series_csv"]
+
+    if advertised_parquet and not parquet_path.is_file():
+        msg = "manifest advertises stack_series.parquet but the file is missing."
+        raise ValueError(msg)
+    if advertised_csv and not csv_path.is_file():
+        msg = "manifest advertises stack_series.csv but the file is missing."
+        raise ValueError(msg)
+
+    frame = _read_optional_parquet(parquet_path)
     if frame is None:
         return None
+    if csv_path.is_file():
+        _validate_stack_series_csv_sidecar(frame, csv_path)
 
     missing = sorted(STACK_SERIES_REQUIRED_COLUMNS.difference(frame.columns))
     if missing:
@@ -161,6 +203,19 @@ def _read_optional_stack_series(path: Path) -> pd.DataFrame | None:
         normalised["gross_operating_value_gbp"] - normalised["degradation_cost_gbp"]
     )
     return normalised
+
+
+def _validate_stack_series_csv_sidecar(parquet_frame: pd.DataFrame, csv_path: Path) -> None:
+    csv_frame = pd.read_csv(csv_path)
+    if len(csv_frame) != len(parquet_frame):
+        msg = "stack_series.csv row count does not match stack_series.parquet."
+        raise ValueError(msg)
+    missing = sorted(STACK_SERIES_REQUIRED_COLUMNS.difference(csv_frame.columns))
+    if missing:
+        msg = f"stack_series.csv missing required columns: {', '.join(missing)}."
+        raise ValueError(msg)
+    for row_index, value in enumerate(csv_frame["caveat_flags"]):
+        _normalise_stack_caveats(value, row_index)
 
 
 def _normalise_stack_caveats(value: object, row_index: int) -> list[str]:

@@ -63,6 +63,12 @@ def test_load_dashboard_cache_reads_phase4_tables(tmp_path: Path) -> None:
     assert cache.data_quality["known_at_policy"] == "test_known_at_policy"
     assert cache.stack_series is not None
     assert cache.stack_series["basis"].tolist() == ["rolling_policy"]
+    assert cache.stack_series_windows is not None
+    assert cache.stack_series_windows["window_label"].tolist() == ["7d"]
+    assert cache.data_quality_summary is not None
+    assert cache.data_quality_summary["price_period_count"].tolist() == [336]
+    assert cache.assumptions_ledger is not None
+    assert cache.source_snapshot is not None
 
 
 def test_load_dashboard_cache_treats_stack_series_as_optional(tmp_path: Path) -> None:
@@ -79,6 +85,17 @@ def test_load_dashboard_cache_rejects_invalid_stack_series_window(tmp_path: Path
     from dashboard.cache_reader import DashboardCacheError, load_dashboard_cache
 
     with pytest.raises(DashboardCacheError, match="Invalid stack_series row 0"):
+        load_dashboard_cache(tmp_path)
+
+
+def test_load_dashboard_cache_rejects_advertised_missing_stack_series_csv(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_dashboard_cache(tmp_path, advertise_stack_series_csv=True)
+    (tmp_path / "stack_series.csv").unlink()
+    from dashboard.cache_reader import DashboardCacheError, load_dashboard_cache
+
+    with pytest.raises(DashboardCacheError, match="stack_series.csv"):
         load_dashboard_cache(tmp_path)
 
 
@@ -106,6 +123,9 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     assert model["has_eac_commitments"] is True
     assert model["has_data_quality"] is True
     assert model["has_stack_series"] is True
+    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["primary_window_label"] == "7d"
+    assert model["stack_index"]["primary_coverage_pct"] == pytest.approx(1.0)
     assert model["stack_story_steps"] == [
         "Elexon BMRS MID wholesale proxy",
         "NESO EAC price-taking availability proxy",
@@ -119,22 +139,33 @@ def _write_minimal_dashboard_cache(
     *,
     include_stack_series: bool = True,
     stack_series_window_label: str = "7d",
+    advertise_stack_series_csv: bool = False,
 ) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
+    files = {
+        "executive_summary": "executive_summary.json",
+        "policy_capture": "policy_capture.parquet",
+        "revenue_stack": "revenue_stack.parquet",
+        "scenario_sweeps": "scenario_sweeps.parquet",
+        "caveats": "caveats.json",
+        "eac_commitments": "eac_commitments.parquet",
+        "data_quality": "data_quality.json",
+    }
+    if include_stack_series:
+        files["stack_series_parquet"] = "stack_series.parquet"
+        if advertise_stack_series_csv:
+            files["stack_series_csv"] = "stack_series.csv"
     (cache_dir / "manifest.json").write_text(
         json.dumps(
             {
                 "run_id": "dashboard-test",
-                "files": {
-                    "executive_summary": "executive_summary.json",
-                    "policy_capture": "policy_capture.parquet",
-                    "revenue_stack": "revenue_stack.parquet",
-                    "scenario_sweeps": "scenario_sweeps.parquet",
-                    "caveats": "caveats.json",
-                    "eac_commitments": "eac_commitments.parquet",
-                    "data_quality": "data_quality.json",
-                    "stack_series_parquet": "stack_series.parquet",
+                "stack_series": {
+                    "primary_window_label": stack_series_window_label,
+                    "eligible_for_public_index": False,
+                    "eligible_for_annualisation": False,
+                    "caveat_flags": ["not_a_market_index"],
                 },
+                "files": files,
             }
         ),
         encoding="utf-8",
@@ -202,12 +233,52 @@ def _write_minimal_dashboard_cache(
                 "known_at_policy": "test_known_at_policy",
                 "solver_failure_count": 0,
                 "excluded_future_row_count": 0,
+                "stack_series_windows": [
+                    {
+                        "window_label": stack_series_window_label,
+                        "observed_period_count": 336,
+                        "expected_period_count": 336,
+                        "coverage_pct": 1.0,
+                        "eligible_for_public_index": False,
+                        "eligible_for_annualisation": False,
+                        "caveat_flags": ["not_a_market_index"],
+                    }
+                ],
             }
         ),
         encoding="utf-8",
     )
+    pd.DataFrame(
+        [
+            {
+                "window_label": stack_series_window_label,
+                "observed_period_count": 336,
+                "expected_period_count": 336,
+                "coverage_pct": 1.0,
+                "eligible_for_public_index": False,
+                "eligible_for_annualisation": False,
+            }
+        ]
+    ).to_csv(cache_dir / "stack_series_windows.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "run_id": "dashboard-test",
+                "price_period_count": 336,
+                "solver_failure_count": 0,
+            }
+        ]
+    ).to_csv(cache_dir / "data_quality_summary.csv", index=False)
+    (cache_dir / "assumptions_ledger.json").write_text(
+        json.dumps({"asset": {"asset_id": "phase4-commercial-reference"}}),
+        encoding="utf-8",
+    )
+    (cache_dir / "source_snapshot.json").write_text(
+        json.dumps({"source_snapshot_hash": "fixture-source"}),
+        encoding="utf-8",
+    )
     if include_stack_series:
-        pd.DataFrame(
+        stack_series = pd.DataFrame(
             [
                 {
                     "timestamp_utc": "2024-01-01T00:00:00+00:00",
@@ -223,4 +294,8 @@ def _write_minimal_dashboard_cache(
                     "degradation_adjusted_value_gbp": 1640.0,
                 }
             ]
-        ).to_parquet(cache_dir / "stack_series.parquet", index=False)
+        )
+        stack_series.to_parquet(cache_dir / "stack_series.parquet", index=False)
+        csv_stack_series = stack_series.copy()
+        csv_stack_series["caveat_flags"] = csv_stack_series["caveat_flags"].map(json.dumps)
+        csv_stack_series.to_csv(cache_dir / "stack_series.csv", index=False)

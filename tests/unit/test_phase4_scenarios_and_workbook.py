@@ -14,10 +14,20 @@ from gb_bess_revenue_stack.cli import app
 from gb_bess_revenue_stack.commercial import CommercialBessSystem
 from gb_bess_revenue_stack.config.models import AssetConfig
 from gb_bess_revenue_stack.markets.eac_prices import synthetic_service_matrix
+from gb_bess_revenue_stack.phase4.aligned_cache import (
+    AlignedCacheRequest,
+    build_aligned_phase4_cache_from_payloads,
+    load_aligned_phase4_cache,
+    write_aligned_phase4_cache,
+)
 from gb_bess_revenue_stack.phase4.scenarios import (
+    Phase4ForecastErrorScenario,
+    build_phase4_historical_sample_from_source_records,
     build_realistic_stress_price_profile,
+    default_phase4_forecast_error_scenarios,
     default_phase4_market_stack_scenarios,
     load_phase4_historical_sample,
+    run_phase4_forecast_error_sweep,
     run_phase4_market_stack_capture_comparison,
     run_phase4_market_stack_sweep,
     run_phase4_smoke_window_comparisons,
@@ -68,6 +78,15 @@ def test_default_phase4_scenarios_include_wholesale_and_eac_stresses() -> None:
     assert "low_spread_eac_downside" in names
     assert all(scenario.stress_label for scenario in scenarios)
     assert "synthetic" not in " ".join(scenario.notes.lower() for scenario in scenarios)
+
+
+def test_default_forecast_error_scenarios_include_bias_and_scalar_cases() -> None:
+    scenarios = default_phase4_forecast_error_scenarios()
+    names = {scenario.name for scenario in scenarios}
+
+    assert "base_forecast" in names
+    assert "price_underforecast_10pct" in names
+    assert "positive_bias_20_gbp_per_mwh" in names
 
 
 def test_phase4_historical_sample_aligns_elexon_mid_and_neso_eac() -> None:
@@ -165,6 +184,56 @@ def test_phase4_historical_sample_rejects_duplicate_settlement_periods(
         load_phase4_historical_sample(elexon_mid_path=elexon_path)
 
 
+def test_release_sample_builder_retains_eac_source_gaps_as_caveats() -> None:
+    sample = build_phase4_historical_sample_from_source_records(
+        elexon_payload=_two_period_elexon_payload(),
+        neso_records=[
+            {
+                "auctionID": 2661,
+                "auctionProduct": "DCL",
+                "serviceType": "Response",
+                "deliveryStart": "2026-04-01T00:00:00",
+                "deliveryEnd": "2026-04-01T00:30:00",
+                "clearedVolume": 1,
+                "clearingPrice": 7.68,
+                "linkedServiceWindowID": None,
+            }
+        ],
+        elexon_source_url="https://data.elexon.co.uk/bmrs/api/v1/balancing/pricing/market-index",
+        neso_source_url="https://api.neso.energy/api/3/action/datastore_search_sql",
+        retrieved_at_utc=datetime(2026, 4, 1, 12, tzinfo=UTC),
+        strict_eac_coverage=False,
+    )
+
+    assert len(sample.prices) == 2
+    assert sample.eac_price_matrix.available_cells_for_period(0)
+    assert sample.eac_price_matrix.available_cells_for_period(1) == []
+    assert any("source gaps" in caveat for caveat in sample.caveats)
+
+
+def test_aligned_cache_writes_and_loads_release_mode_fixture_files(tmp_path: Path) -> None:
+    request = AlignedCacheRequest(
+        start_utc=datetime(2026, 4, 1, tzinfo=UTC),
+        end_utc=datetime(2026, 4, 1, 1, tzinfo=UTC),
+        elexon_provider="APXMIDP",
+    )
+    cache = build_aligned_phase4_cache_from_payloads(
+        request=request,
+        elexon_payload=_two_period_elexon_payload(),
+        neso_records=[],
+        retrieved_at_utc=datetime(2026, 4, 1, 12, tzinfo=UTC),
+    )
+
+    paths = write_aligned_phase4_cache(cache, tmp_path)
+    loaded = load_aligned_phase4_cache(tmp_path)
+
+    assert paths["elexon_mid"] == tmp_path / "elexon_mid.json"
+    assert paths["neso_eac"] == tmp_path / "neso_eac.json"
+    assert loaded.manifest["price_period_count"] == 2
+    assert loaded.sample.label == "elexon_mid_neso_eac_2026_04_01_0000_0100_utc"
+    assert loaded.manifest["eac_source_gap_period_count"] == 2
+
+
 def test_market_stack_capture_comparison_reports_perfect_foresight_ceiling() -> None:
     prices = build_realistic_stress_price_profile(
         start_utc=datetime(2024, 1, 1, tzinfo=UTC),
@@ -210,6 +279,46 @@ def test_market_stack_capture_comparison_reports_perfect_foresight_ceiling() -> 
     )
     assert comparison.capture_ratio == pytest.approx(1)
     assert comparison.regret_gbp == pytest.approx(0)
+
+
+def test_forecast_error_sweep_reports_forecast_error_metrics() -> None:
+    prices = build_realistic_stress_price_profile(
+        start_utc=datetime(2024, 1, 1, tzinfo=UTC),
+        day_count=1,
+    )[:4]
+    matrix = synthetic_service_matrix(
+        product_model_label="dynamic_containment_low",
+        direction_model_label="upward",
+        prices_gbp_per_mw_h=[12] * len(prices),
+        duration_h=0.5,
+    )
+    config = RollingConfig(
+        horizon_periods=len(prices),
+        step_periods=len(prices),
+        terminal_soc_policy="target",
+        terminal_soc_target_mwh=1,
+    )
+
+    results = run_phase4_forecast_error_sweep(
+        prices=prices,
+        eac_price_matrix=matrix,
+        asset=_phase4_test_asset(),
+        initial_soc_mwh=1,
+        forecast_model=OracleForecast(),
+        config=config,
+        scenarios=[
+            Phase4ForecastErrorScenario(name="base_forecast"),
+            Phase4ForecastErrorScenario(
+                name="positive_bias",
+                price_bias_gbp_per_mwh=10,
+            ),
+        ],
+    )
+
+    assert [result.name for result in results] == ["base_forecast", "positive_bias"]
+    assert results[0].forecast_mae_gbp_per_mwh == pytest.approx(0)
+    assert results[1].forecast_mae_gbp_per_mwh == pytest.approx(10)
+    assert results[1].forecast_model.startswith("oracle_diagnostic:positive_bias")
 
 
 def test_phase4_smoke_window_comparisons_include_24h_and_48h_windows() -> None:
@@ -532,3 +641,27 @@ def _phase4_test_asset() -> AssetConfig:
         eta_charge=1,
         eta_discharge=1,
     )
+
+
+def _two_period_elexon_payload() -> dict[str, object]:
+    return {
+        "metadata": {"datasets": ["MID"]},
+        "data": [
+            {
+                "startTime": "2026-04-01T00:00:00Z",
+                "dataProvider": "APXMIDP",
+                "settlementDate": "2026-04-01",
+                "settlementPeriod": 1,
+                "price": 80.0,
+                "volume": 100.0,
+            },
+            {
+                "startTime": "2026-04-01T00:30:00Z",
+                "dataProvider": "APXMIDP",
+                "settlementDate": "2026-04-01",
+                "settlementPeriod": 2,
+                "price": 100.0,
+                "volume": 100.0,
+            },
+        ],
+    }
