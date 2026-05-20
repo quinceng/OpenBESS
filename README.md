@@ -1,5 +1,7 @@
 # OpenBESS
 
+[![CI](https://github.com/quinceng/OpenBESS/actions/workflows/ci.yml/badge.svg)](https://github.com/quinceng/OpenBESS/actions/workflows/ci.yml)
+
 OpenBESS is an open source research project for modelling the value of battery
 energy storage in Great Britain. A battery energy storage system is often
 called a BESS. It stores electricity when charging and returns electricity to
@@ -130,6 +132,8 @@ uv run gb-bess run-smoke
 uv run gb-bess run-rolling-smoke
 uv run gb-bess run-market-stack-smoke
 uv run gb-bess run-phase4-smoke --finance-assumptions-yaml configs/finance_assumptions.yaml
+uv run gb-bess build-phase4-aligned-cache --days 7
+uv run gb-bess run-release-cache --aligned-cache-dir results/runs/release_cache/aligned_sources
 uv run gb-bess build-stack-series --cache-dir results/dashboard --output-dir results/dashboard
 uv run gb-bess run-residential-scenario-sweep
 uv run streamlit run dashboard/streamlit_app.py
