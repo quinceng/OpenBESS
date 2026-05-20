@@ -3,7 +3,11 @@ name = "gb-bess-revenue-stack"
 version = "0.1.0"
 description = "Public-data GB BESS revenue-stack modelling and OpenBESS Stack Index preview."
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11,<3.13"
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+]
 dependencies = [
   "httpx>=0.27",
   "numpy>=1.26",
@@ -44,9 +48,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gb_bess_revenue_stack"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/gb_bess_revenue_stack/phase4/fixtures" = "gb_bess_revenue_stack/phase4/fixtures"
 
 [tool.pytest.ini_options]
 addopts = "-m 'not integration'"
