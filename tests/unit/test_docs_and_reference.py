@@ -78,3 +78,61 @@ def test_release_docs_record_historical_phase4_and_residential_scenario_sweeps()
 def test_release_hardening_files_exist() -> None:
     assert (ROOT / "LICENSE").is_file()
     assert (ROOT / "CHANGELOG.md").is_file()
+
+
+def test_openbess_stack_index_public_doc_records_required_boundary_language() -> None:
+    doc = (ROOT / "docs/openbess_stack_index.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "OpenBESS Stack Index",
+        "OpenBESS Stack Index Preview",
+        "not an official market index",
+        "not investment advice",
+        "Elexon BMRS MID wholesale proxy",
+        "NESO EAC price-taking availability proxy",
+        "Capacity Market annual scenario",
+        "known_at_utc <= decision_time_utc",
+        "Balancing Mechanism counterfactual revenue is excluded",
+        "educational simple-market preset",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in doc
+
+    for phrase in [
+        "reference assets",
+        "GB sequence",
+        "7d",
+        "30d",
+        "90d",
+        "ytd",
+        "trailing_12m",
+        "published artefacts",
+        "not_a_market_index",
+        "partial_sample_annualised",
+        "asset actually solved",
+        "suppressed/null until coverage gates pass",
+        "calendar year-to-date",
+    ]:
+        assert phrase in doc
+
+
+def test_openbess_stack_index_is_referenced_by_boundary_docs() -> None:
+    methodology = (ROOT / "docs/methodology.md").read_text(encoding="utf-8")
+    model_boundaries = (ROOT / "docs/model_boundaries.md").read_text(encoding="utf-8")
+    product_plan = (ROOT / "docs/product_plan.md").read_text(encoding="utf-8")
+    cache_contract = (ROOT / "docs/dashboard_cache_contract.md").read_text(encoding="utf-8")
+    release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
+
+    assert "openbess_stack_index.md" in methodology
+    assert "OpenBESS Stack Index" in product_plan
+    assert "not_a_market_index" in model_boundaries
+    assert "not_a_market_index" in cache_contract
+    assert "stack_series.parquet" in cache_contract
+    assert "stack_series.csv" in cache_contract
+    assert "data_quality.json` under\n`stack_series_windows`" in cache_contract
+    assert "90d window is the minimum annualisation" in cache_contract
+    assert "asset actually solved in the cache" in cache_contract
+    assert "duplicate fixed 90-day" in cache_contract
+    assert "suppressed/null until stack-series coverage gates pass" in cache_contract
+    assert "preview labelling" in release_checklist

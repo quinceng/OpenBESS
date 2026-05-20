@@ -89,6 +89,9 @@ Use this checklist before publishing Release 1.
 - All charts have units.
 - Caveats are visible without opening methodology.
 - Missing cache files fail gracefully.
+- OpenBESS Stack Index outputs use preview labelling unless coverage gates pass.
+- Manifest and caveats include `not_a_market_index` for named OpenBESS outputs.
+- `stack_series.csv` and `stack_series.parquet` are generated from the same dataframe.
 
 ## 10. Documentation
 
@@ -97,7 +100,7 @@ Use this checklist before publishing Release 1.
 - Reproducibility guide is accurate.
 - Known limitations are visible.
 - Residential scenario sweep caveats are visible.
-- Interview demo script exists.
+- Demo walkthrough exists.
 - Phase reviews exist for completed phases.
 - README, dashboard and methodology tell the same story.
 
@@ -106,5 +109,7 @@ Use this checklist before publishing Release 1.
 - Version number chosen.
 - Changelog or release note written.
 - Release artefacts rebuilt.
+- Next-depth roadmap links remain current if the release is promoted with known
+  follow-on scope.
 - Final smoke test run after artefact rebuild.
 - Git tag created if using git release flow.

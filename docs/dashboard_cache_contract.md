@@ -46,6 +46,8 @@ results/dashboard/policy_capture.parquet
 results/dashboard/eac_commitments.parquet
 results/dashboard/scenario_sweeps.parquet
 results/dashboard/finance_cashflows.parquet
+results/dashboard/stack_series.parquet
+results/dashboard/stack_series.csv
 results/dashboard/benchmark_reconciliation.json
 results/dashboard/data_quality.json
 results/dashboard/caveats.json
@@ -63,6 +65,8 @@ results/dashboard/scenario_sweeps.parquet
 results/dashboard/degradation_summary.json
 results/dashboard/finance_summary.json
 results/dashboard/finance_cashflows.parquet
+results/dashboard/stack_series.parquet
+results/dashboard/stack_series.csv
 results/dashboard/benchmark_reconciliation.json
 results/dashboard/eac_commitments.parquet
 results/dashboard/data_quality.json
@@ -73,6 +77,22 @@ results/dashboard/caveats.json
 decision step, service label and direction. `data_quality.json` records source
 IDs, known-at policy, solver failure count, excluded future rows and service
 cell coverage.
+
+`stack_series.parquet` and `stack_series.csv` record the OpenBESS Stack Index
+Preview series from the same dataframe. The CSV export serialises
+`caveat_flags` as JSON text. Both exports contain row-level stack values and
+must preserve `not_a_market_index`.
+
+The row `asset_id` identifies the asset actually solved in the cache.
+`openbess_canonical_1mw_2mwh` is only valid for canonical reference runs, not
+every smoke run.
+
+Window eligibility metadata lives in `data_quality.json` under
+`stack_series_windows`, including coverage percentages, annualisation
+eligibility, public-index eligibility and `expected_period_basis` for each
+tracked window. The `ytd` window uses calendar year-to-date from
+`created_at_utc` with a 90-day minimum floor, not a duplicate fixed 90-day
+window.
 
 ## 4. Executive Summary Schema
 
@@ -100,7 +120,13 @@ Minimum caveat flags:
 - `cm_scenario_only`;
 - `finance_scenario_appraisal`;
 - `benchmark_reconciliation_not_replication`;
+- `not_a_market_index`;
 - `partial_sample_annualised` where applicable.
+
+The 90d window is the minimum annualisation and public eligibility gate. Shorter
+windows may be displayed as preview diagnostics. Any annualised value from an
+incomplete sample must include `partial_sample_annualised`.
+Annualised finance and benchmark model fields are suppressed/null until stack-series coverage gates pass.
 
 ## 6. Dashboard Failure Behaviour
 

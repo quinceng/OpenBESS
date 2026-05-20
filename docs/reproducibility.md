@@ -1,6 +1,8 @@
 # Reproducibility Guide
 
-This guide defines the intended clean-clone workflow for the target repository. Commands may be adjusted during implementation, but the release must preserve the same reproducibility story.
+This guide defines the clean-clone workflow for this repository. Commands may
+be adjusted during implementation, but each release must preserve the same
+reproducibility story.
 
 ## 1. Environment
 

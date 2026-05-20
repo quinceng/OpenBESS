@@ -174,19 +174,19 @@ def build_flat_public_reference_load_profile(
     average_kw = assumptions.default_annual_load_kwh / 8760
 
     rows: list[ResidentialHouseholdInterval] = []
-    cursor = start
-    while cursor < end:
-        next_cursor = min(cursor + interval, end)
-        duration_h = (next_cursor - cursor).total_seconds() / 3600
+    interval_start = start
+    while interval_start < end:
+        interval_end = min(interval_start + interval, end)
+        duration_h = (interval_end - interval_start).total_seconds() / 3600
         rows.append(
             ResidentialHouseholdInterval(
-                delivery_start_utc=cursor,
-                delivery_end_utc=next_cursor,
+                delivery_start_utc=interval_start,
+                delivery_end_utc=interval_end,
                 load_kwh=average_kw * duration_h,
                 pv_generation_kwh=0,
             )
         )
-        cursor = next_cursor
+        interval_start = interval_end
     return rows
 
 

@@ -1,6 +1,6 @@
-# Interview Demo Script
+# Demo Walkthrough
 
-This script keeps the public demo aligned with the project boundaries.
+This walkthrough keeps the public demo aligned with the project boundaries.
 
 ## 30-Second Pitch
 

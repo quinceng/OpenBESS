@@ -25,7 +25,22 @@ OPTIONAL_FILES = {
     "benchmark_reconciliation": "benchmark_reconciliation.json",
     "eac_commitments": "eac_commitments.parquet",
     "data_quality": "data_quality.json",
+    "stack_series": "stack_series.parquet",
 }
+
+STACK_SERIES_REQUIRED_COLUMNS = {
+    "timestamp_utc",
+    "window_label",
+    "asset_id",
+    "basis",
+    "wholesale_energy_gbp",
+    "eac_availability_gbp",
+    "degradation_cost_gbp",
+    "cm_annual_scenario_gbp_per_mw_year",
+    "caveat_flags",
+}
+STACK_SERIES_WINDOW_LABELS = {"7d", "30d", "90d", "ytd", "trailing_12m"}
+STACK_SERIES_BASIS_VALUES = {"rolling_policy", "perfect_foresight", "scenario"}
 
 
 class DashboardCacheError(RuntimeError):
@@ -49,6 +64,7 @@ class DashboardCache:
     benchmark_reconciliation: dict[str, Any] | None = None
     eac_commitments: pd.DataFrame | None = None
     data_quality: dict[str, Any] | None = None
+    stack_series: pd.DataFrame | None = None
 
 
 def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> DashboardCache:
@@ -80,6 +96,7 @@ def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Dashboard
             ),
             eac_commitments=_read_optional_parquet(root / OPTIONAL_FILES["eac_commitments"]),
             data_quality=_read_optional_json(root / OPTIONAL_FILES["data_quality"]),
+            stack_series=_read_optional_stack_series(root / OPTIONAL_FILES["stack_series"]),
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         msg = f"Dashboard cache at {root} could not be read: {exc}"
@@ -100,3 +117,67 @@ def _read_optional_json(path: Path) -> dict[str, Any] | None:
 
 def _read_optional_parquet(path: Path) -> pd.DataFrame | None:
     return pd.read_parquet(path) if path.is_file() else None
+
+
+def _read_optional_stack_series(path: Path) -> pd.DataFrame | None:
+    frame = _read_optional_parquet(path)
+    if frame is None:
+        return None
+
+    missing = sorted(STACK_SERIES_REQUIRED_COLUMNS.difference(frame.columns))
+    if missing:
+        msg = f"stack_series.parquet missing required columns: {', '.join(missing)}."
+        raise ValueError(msg)
+
+    normalised = frame.copy()
+    normalised["caveat_flags"] = [
+        _normalise_stack_caveats(value, row_index)
+        for row_index, value in enumerate(normalised["caveat_flags"])
+    ]
+    normalised["timestamp_utc"] = pd.to_datetime(normalised["timestamp_utc"], utc=True)
+
+    for row_index, row in normalised.iterrows():
+        if row["window_label"] not in STACK_SERIES_WINDOW_LABELS:
+            msg = f"Invalid stack_series row {row_index}: unknown window_label."
+            raise ValueError(msg)
+        if row["basis"] not in STACK_SERIES_BASIS_VALUES:
+            msg = f"Invalid stack_series row {row_index}: unknown basis."
+            raise ValueError(msg)
+        if float(row["degradation_cost_gbp"]) < 0:
+            msg = f"Invalid stack_series row {row_index}: negative degradation_cost_gbp."
+            raise ValueError(msg)
+        cm_value = row["cm_annual_scenario_gbp_per_mw_year"]
+        if pd.notna(cm_value) and float(cm_value) < 0:
+            msg = (
+                f"Invalid stack_series row {row_index}: "
+                "negative cm_annual_scenario_gbp_per_mw_year."
+            )
+            raise ValueError(msg)
+
+    normalised["gross_operating_value_gbp"] = (
+        normalised["wholesale_energy_gbp"] + normalised["eac_availability_gbp"]
+    )
+    normalised["degradation_adjusted_value_gbp"] = (
+        normalised["gross_operating_value_gbp"] - normalised["degradation_cost_gbp"]
+    )
+    return normalised
+
+
+def _normalise_stack_caveats(value: object, row_index: int) -> list[str]:
+    if isinstance(value, str):
+        parsed = json.loads(value)
+        if not isinstance(parsed, list):
+            msg = f"Invalid stack_series row {row_index}: caveat_flags is not a list."
+            raise ValueError(msg)
+        return [str(item) for item in parsed]
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, tuple):
+        return [str(item) for item in value]
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        parsed = tolist()
+        if isinstance(parsed, list):
+            return [str(item) for item in parsed]
+    msg = f"Invalid stack_series row {row_index}: caveat_flags is not a list."
+    raise ValueError(msg)

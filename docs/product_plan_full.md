@@ -7,7 +7,7 @@
 **Version:** 3.0 revised canonical plan  
 **Prepared:** 2026-05-16  
 **Primary user:** energy-market modeller, graduate analyst, technical portfolio reviewer  
-**Target audience:** Aurora Energy Research, LCP Delta, Cornwall Insight, AFRY, Baringa, NESO, Frontier Economics, DESNZ, Climate Change Committee
+**Target audience:** GB power-market analysts, energy-market consultants, public-sector energy reviewers and technical portfolio reviewers
 
 ---
 
@@ -27,7 +27,7 @@ The product optimises a reference 2-hour GB BESS using:
 - 15-year NPV as illustrative scenario appraisal, not bankability analysis;
 - public benchmark reconciliation against Modo-style industry anchors without claiming replication.
 
-The final artefact is a polished open-source repository, cached dashboard, methodology paper and interview demo that answers:
+The final artefact is a polished open-source repository, cached dashboard, methodology paper and demo walkthrough that answers:
 
 > Under transparent public-data assumptions, how much value can a reference 2-hour GB BESS capture from wholesale proxy and EAC availability revenues, how much of a perfect-foresight ceiling is achievable by a no-leakage rolling policy, and which public-data limitations explain divergence from commercial benchmark narratives?
 
@@ -70,14 +70,14 @@ This revision incorporates the plan critique and makes the following decisions c
 - illustrative NPV scenarios with finance exclusions;
 - public benchmark reconciliation scorecard;
 - cached Streamlit dashboard;
-- methodology paper, reproducibility guide and interview demo script.
+- methodology paper, reproducibility guide and demo walkthrough.
 
 ### 3.2 Release 1 excludes
 
 - deterministic Balancing Mechanism counterfactual revenue for a hypothetical asset;
 - full EAC auction-clearing simulation or strategic bid construction;
 - endogenous GB price engine or whole-system dispatch model;
-- RL trading agent;
+- reinforcement-learning trading system;
 - exact rainflow counting inside the MILP;
 - electrochemical cell model;
 - full PyPSA-GB calibration;
@@ -168,7 +168,7 @@ gb-bess-revenue-stack/
 │   ├── known_limitations.md
 │   ├── reproducibility.md
 │   ├── validation_memo.md
-│   ├── interview_demo_script.md
+│   ├── demo_walkthrough.md
 │   ├── phase_reviews/
 │   └── adr/
 │
@@ -651,7 +651,7 @@ Add degradation proxy, rainflow audit if stable, NPV scenarios, finance boundary
 
 ### Phase 6 — Dashboard, methodology and release
 
-Package the product: cached dashboard, README, methodology paper, reproducibility guide, limitations, release checklist and interview script.
+Package the product: cached dashboard, README, methodology paper, reproducibility guide, limitations, release checklist and demo walkthrough.
 
 ### Phase 7 — Optional stochastic extension
 

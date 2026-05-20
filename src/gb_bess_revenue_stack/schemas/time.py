@@ -43,17 +43,17 @@ def settlement_periods_for_gb_date(settlement_day: date) -> list[SettlementPerio
 
     local_start = datetime.combine(settlement_day, datetime.min.time(), tzinfo=GB_TZ)
     local_end = local_start + timedelta(days=1)
-    cursor = local_start.astimezone(UTC)
+    interval_start = local_start.astimezone(UTC)
     utc_end = local_end.astimezone(UTC)
     periods: list[SettlementPeriodIndex] = []
     period = 1
-    while cursor < utc_end:
-        delivery_end = cursor + timedelta(minutes=30)
+    while interval_start < utc_end:
+        delivery_end = interval_start + timedelta(minutes=30)
         periods.append(
             SettlementPeriodIndex(
-                delivery_start_utc=cursor,
+                delivery_start_utc=interval_start,
                 delivery_end_utc=delivery_end,
-                timestamp_local=cursor.astimezone(GB_TZ).isoformat(),
+                timestamp_local=interval_start.astimezone(GB_TZ).isoformat(),
                 settlement_date=settlement_day.isoformat(),
                 settlement_period=period,
                 duration_h=0.5,
@@ -65,6 +65,6 @@ def settlement_periods_for_gb_date(settlement_day: date) -> list[SettlementPerio
                 quality_flag="ok",
             )
         )
-        cursor = delivery_end
+        interval_start = delivery_end
         period += 1
     return periods

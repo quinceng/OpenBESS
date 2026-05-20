@@ -1,10 +1,16 @@
 # Product Plan
 
-This document is the compact repo-facing product plan. The full governing plan is `../GB_BESS_Optimisation_Product_Plan.md`.
+This document is the compact product plan for the OpenBESS public repository.
 
 ## 1. Product
 
 Build a transparent public-data GB battery energy storage revenue-stack optimiser for a reference BESS asset.
+
+The public-facing series name for release artefacts is OpenBESS Stack Index.
+Public wording must preserve the caveats in this plan: the series is a
+transparent public-data research output, not an official market index,
+investment recommendation, bankability conclusion or proprietary benchmark
+replication.
 
 The product answers:
 
@@ -51,7 +57,7 @@ The project should be understandable in under 10 minutes and inspectable in dept
 - strategic bidding;
 - acceptance probability;
 - endogenous price simulation;
-- RL trading agent;
+- reinforcement-learning trading system;
 - electrochemical cell model;
 - bankability conclusion;
 - proprietary benchmark replication;

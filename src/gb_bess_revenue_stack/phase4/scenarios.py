@@ -300,7 +300,7 @@ def run_phase4_market_stack_sweep(
 ) -> Phase4ScenarioSweepResult:
     """Run the Phase 4 deterministic rolling market-stack scenario sweep."""
 
-    selected = scenarios or default_phase4_market_stack_scenarios()
+    selected = default_phase4_market_stack_scenarios() if scenarios is None else scenarios
     results = run_rolling_market_stack_scenarios(
         prices=prices,
         eac_price_matrix=eac_price_matrix,

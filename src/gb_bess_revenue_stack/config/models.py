@@ -118,14 +118,14 @@ def load_run_config(path: str | Path, *, env_prefix: str = "GB_BESS_") -> RunCon
 
 
 def _set_nested(payload: dict[str, Any], path_parts: list[str], value: Any) -> None:
-    cursor = payload
+    target = payload
     for part in path_parts[:-1]:
-        existing = cursor.setdefault(part, {})
+        existing = target.setdefault(part, {})
         if not isinstance(existing, dict):
             msg = f"Cannot set nested override through non-mapping key {part!r}."
             raise ValueError(msg)
-        cursor = existing
-    cursor[path_parts[-1]] = value
+        target = existing
+    target[path_parts[-1]] = value
 
 
 def _parse_env_value(value: str) -> Any:

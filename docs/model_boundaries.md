@@ -23,6 +23,10 @@ This project does not:
 - prove bankable returns;
 - provide investment advice.
 
+Named OpenBESS outputs, including the OpenBESS Stack Index, must carry
+`not_a_market_index`. They are not official market indices, proprietary-model
+replications or bankable revenue assessments.
+
 ## 3. Asset Boundary
 
 Central asset:

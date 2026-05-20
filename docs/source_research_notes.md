@@ -2,8 +2,6 @@
 
 These notes summarise the research anchors used to shape the plan. They are not a substitute for the Phase 1 P1-00 feasibility gate.
 
-This file is intended to be carried into the target repository as the durable research-note starting point. If the surrounding plan pack also contains a root-level `SOURCE_RESEARCH_NOTES.md`, treat that root file as historical backup rather than a required source file.
-
 ## 1. Elexon BMRS Market Index Data
 
 Research anchor:

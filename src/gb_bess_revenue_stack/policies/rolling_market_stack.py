@@ -128,10 +128,10 @@ def run_rolling_market_stack_policy(
     global_period_index = {point.delivery_start_utc: index for index, point in enumerate(ordered)}
     soc_mwh = initial_soc_mwh
     steps: list[RollingMarketStackStepRecord] = []
-    cursor = 0
+    period_index = 0
     solver_failure_count = 0
-    while cursor < len(evaluation_prices):
-        horizon = evaluation_prices[cursor : cursor + config.horizon_periods]
+    while period_index < len(evaluation_prices):
+        horizon = evaluation_prices[period_index : period_index + config.horizon_periods]
         if not horizon:
             break
         decision_time = horizon[0].delivery_start_utc
@@ -212,7 +212,7 @@ def run_rolling_market_stack_policy(
                 solver_wall_time_seconds=market_stack.solver.wall_time_seconds,
             )
         )
-        cursor += execute_count
+        period_index += execute_count
 
     return RollingMarketStackRun(
         steps=steps,

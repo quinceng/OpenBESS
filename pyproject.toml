@@ -1,7 +1,7 @@
 [project]
 name = "gb-bess-revenue-stack"
 version = "0.1.0"
-description = "Public-data GB BESS revenue-stack optimiser foundation."
+description = "Public-data GB BESS revenue-stack modelling and OpenBESS Stack Index preview."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [

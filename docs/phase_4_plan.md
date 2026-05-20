@@ -26,7 +26,8 @@ Phase 4 extends the no-leakage rolling policy from wholesale-only dispatch to wh
 
 ## Next
 
-- Add forecast-error sweeps once the rolling EAC baseline is stable.
+- Add forecast-error sweeps once the longer aligned Elexon/NESO cache is
+  available.
 - Expand the residential branch from the bill-aware household dispatch slice into
   deeper shaped household archetypes, PV size sweeps, cycling/degradation
   sensitivities and homeowner/investor summary outputs.
@@ -89,4 +90,6 @@ Dashboard cache files:
 - `benchmark_reconciliation.json`;
 - `eac_commitments.parquet`;
 - `data_quality.json`;
+- `stack_series.parquet`;
+- `stack_series.csv`;
 - `caveats.json`.

@@ -124,10 +124,10 @@ def run_rolling_policy(
         raise RollingPolicyError(msg)
     soc_mwh = initial_soc_mwh
     steps: list[RollingStepRecord] = []
-    cursor = 0
+    period_index = 0
     solver_failure_count = 0
-    while cursor < len(evaluation_prices):
-        horizon = evaluation_prices[cursor : cursor + config.horizon_periods]
+    while period_index < len(evaluation_prices):
+        horizon = evaluation_prices[period_index : period_index + config.horizon_periods]
         if not horizon:
             break
         decision_time = horizon[0].delivery_start_utc
@@ -194,7 +194,7 @@ def run_rolling_policy(
                 solver_wall_time_seconds=diagnostics.wall_time_seconds,
             )
         )
-        cursor += execute_count
+        period_index += execute_count
     return RollingRun(
         steps=steps,
         realised_revenue_gbp=sum(step.realised_revenue_gbp for step in steps),

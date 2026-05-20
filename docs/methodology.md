@@ -2,6 +2,10 @@
 
 This document is the methodology contract for Release 1. During implementation it should evolve from a contract into the final methodology paper by adding source verification outcomes, result figures and run IDs.
 
+The public series methodology for named OpenBESS outputs is documented in
+[`openbess_stack_index.md`](openbess_stack_index.md). This document remains the
+detailed equations and implementation contract behind that public methodology.
+
 ## 1. Research Question
 
 The project estimates the revenue stack available to a reference GB BESS under transparent public-data assumptions. It compares perfect-foresight upper-bound dispatch with no-leakage rolling policies and explains divergence from public benchmark narratives.

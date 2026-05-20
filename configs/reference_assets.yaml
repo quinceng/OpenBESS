@@ -1,0 +1,37 @@
+assets:
+  openbess_canonical_1mw_2mwh:
+    public_label: OpenBESS canonical GB 1MW/2MWh BESS
+    asset:
+      name: openbess-canonical-1mw-2mwh
+      power_mw: 1.0
+      energy_capacity_mwh: 2.0
+      round_trip_efficiency: 0.88
+      soc_min_mwh: 0.1
+      soc_max_mwh: 1.9
+    eac_eligible: true
+    cm_duration_hours: 2.0
+    degradation_cost_gbp_per_mwh_throughput: 2.0
+    caveat_flags:
+      - public_data_reference_asset
+      - eac_price_taking_proxy
+      - cm_scenario_only
+      - not_investment_advice
+      - not_a_market_index
+  openbess_simple_market_1mw_1mwh:
+    public_label: OpenBESS educational simple-market preset
+    asset:
+      name: openbess-simple-market-1mw-1mwh
+      power_mw: 1.0
+      energy_capacity_mwh: 1.0
+      round_trip_efficiency: 1.0
+      soc_min_mwh: 0.0
+      soc_max_mwh: 1.0
+    eac_eligible: false
+    cm_duration_hours: null
+    degradation_cost_gbp_per_mwh_throughput: 0.0
+    caveat_flags:
+      - educational_simplified_asset
+      - wholesale_only_comparator
+      - excludes_efficiency_losses
+      - not_investment_advice
+      - not_a_market_index

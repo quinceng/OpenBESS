@@ -14,6 +14,13 @@ from dashboard.cache_reader import (
     load_dashboard_cache,
 )
 
+STACK_STORY_STEPS = [
+    "Elexon BMRS MID wholesale proxy",
+    "NESO EAC price-taking availability proxy",
+    "Capacity Market annual scenario",
+    "Degradation-adjusted rolling policy",
+]
+
 
 def build_view_model(cache: DashboardCache) -> dict[str, Any]:
     """Build display-ready values from cached dashboard artefacts."""
@@ -40,6 +47,8 @@ def build_view_model(cache: DashboardCache) -> dict[str, Any]:
         or cache.benchmark_reconciliation is not None,
         "has_eac_commitments": cache.eac_commitments is not None,
         "has_data_quality": cache.data_quality is not None,
+        "has_stack_series": cache.stack_series is not None,
+        "stack_story_steps": STACK_STORY_STEPS,
     }
 
 
@@ -64,6 +73,7 @@ def render_dashboard(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> None:
     _render_revenue_stack(st, cache)
     _render_scenarios(st, cache)
     _render_phase5(st, cache)
+    _render_stack_index_preview(st, cache, model)
     _render_data_quality(st, cache)
     _render_sources_and_caveats(st, model)
 
@@ -153,6 +163,31 @@ def _render_phase5(st: Any, cache: DashboardCache) -> None:
         st.dataframe(cache.finance_cashflows, hide_index=True, use_container_width=True)
     if cache.benchmark_reconciliation is not None:
         st.json(cache.benchmark_reconciliation)
+
+
+def _render_stack_index_preview(
+    st: Any,
+    cache: DashboardCache,
+    model: dict[str, Any],
+) -> None:
+    if cache.stack_series is None:
+        return
+    st.subheader("OpenBESS Stack Index Preview")
+    st.caption(" | ".join(model["stack_story_steps"]))
+    columns = [
+        "window_label",
+        "basis",
+        "wholesale_energy_gbp",
+        "eac_availability_gbp",
+        "degradation_cost_gbp",
+        "degradation_adjusted_value_gbp",
+    ]
+    available_columns = [column for column in columns if column in cache.stack_series.columns]
+    st.dataframe(
+        cache.stack_series[available_columns],
+        hide_index=True,
+        use_container_width=True,
+    )
 
 
 def _render_data_quality(st: Any, cache: DashboardCache) -> None:

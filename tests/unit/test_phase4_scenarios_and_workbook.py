@@ -19,6 +19,7 @@ from gb_bess_revenue_stack.phase4.scenarios import (
     default_phase4_market_stack_scenarios,
     load_phase4_historical_sample,
     run_phase4_market_stack_capture_comparison,
+    run_phase4_market_stack_sweep,
     run_phase4_smoke_window_comparisons,
     skipped_phase4_smoke_windows,
 )
@@ -258,6 +259,28 @@ def test_phase4_smoke_window_skips_short_historical_samples() -> None:
     assert all(item.available_period_count == len(sample.prices) for item in skipped)
 
 
+def test_phase4_market_stack_sweep_respects_explicit_empty_scenarios() -> None:
+    sample = load_phase4_historical_sample()
+
+    sweep = run_phase4_market_stack_sweep(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=_phase4_test_asset(),
+        initial_soc_mwh=1,
+        forecast_model=OracleForecast(),
+        config=RollingConfig(
+            horizon_periods=2,
+            step_periods=1,
+            terminal_soc_policy="target",
+            terminal_soc_target_mwh=1,
+        ),
+        scenarios=[],
+    )
+
+    assert sweep.price_period_count == len(sample.prices)
+    assert sweep.scenario_results == []
+
+
 def test_phase4_smoke_command_writes_historical_source_labels(tmp_path: Path) -> None:
     output_dir = tmp_path / "phase4"
     dashboard_dir = tmp_path / "dashboard"
@@ -282,7 +305,14 @@ def test_phase4_smoke_command_writes_historical_source_labels(tmp_path: Path) ->
     smoke_windows = json.loads(
         (output_dir / "smoke_window_comparisons.json").read_text(encoding="utf-8")
     )
+    stack_series = pd.read_parquet(dashboard_dir / "stack_series.parquet")
     rolling = json.loads((output_dir / "rolling_market_stack_run.json").read_text(encoding="utf-8"))
+    scenario_sweep = json.loads(
+        (output_dir / "phase4_scenario_sweep.json").read_text(encoding="utf-8")
+    )
+    base_case = next(
+        result for result in scenario_sweep["scenario_results"] if result["name"] == "base_case"
+    )
 
     assert summary["historical_sample_label"] == ("elexon_mid_neso_eac_2026_04_01_0000_0230_utc")
     assert summary["period_count"] == 5
@@ -293,10 +323,19 @@ def test_phase4_smoke_command_writes_historical_source_labels(tmp_path: Path) ->
     assert len(rolling["steps"]) == summary["period_count"]
     assert any(step["excluded_service_cell_count"] > 0 for step in rolling["steps"])
     assert summary["rolling_total_revenue_gbp"] > 0
+    assert base_case["realised_total_revenue_gbp"] == pytest.approx(
+        summary["rolling_total_revenue_gbp"]
+    )
+    assert base_case["realised_total_revenue_gbp"] < summary["perfect_total_revenue_gbp"]
     assert summary["rolling_policy_horizon_periods"] == 4
     assert summary["rolling_policy_step_periods"] == 1
     assert smoke_windows["comparisons"] == []
     assert [item["label"] for item in smoke_windows["skipped_windows"]] == ["24h", "48h"]
+    assert stack_series["asset_id"].tolist() == [
+        "phase4-commercial-reference",
+        "phase4-commercial-reference",
+    ]
+    assert "openbess_canonical_1mw_2mwh" not in stack_series["asset_id"].tolist()
     assert any("24h smoke comparison skipped" in caveat for caveat in caveats["caveats"])
     assert any(
         "not 24h wholesale forecast-policy performance" in caveat for caveat in caveats["caveats"]
@@ -365,6 +404,7 @@ def test_phase4_dashboard_cache_writer_outputs_contract_files(tmp_path: Path) ->
                 "wholesale": "synthetic Phase 4 stress profile",
                 "eac": "synthetic EAC availability proxy",
             },
+            stack_series_asset_id="phase4-dashboard-cache-asset",
             created_at_utc=datetime(2024, 1, 2, tzinfo=UTC),
         ),
         tmp_path,

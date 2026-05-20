@@ -3,7 +3,7 @@
 **Project:** Open GB BESS Revenue-Stack Optimiser  
 **Repository:** `gb-bess-revenue-stack`  
 **Canonical package:** `src/gb_bess_revenue_stack/`  
-**Governing product plan:** `GB_BESS_Optimisation_Product_Plan.md`
+**Public product name:** OpenBESS
 
 ---
 
@@ -353,7 +353,7 @@ Every processed dataset has a manifest with:
 
 Tasks:
 
-- verify Elexon, EAC, CM and benchmark sources, using `SOURCE_RESEARCH_NOTES.md` as starting evidence;
+- verify Elexon, EAC, CM and benchmark sources, using `docs/source_research_notes.md` as starting evidence;
 - record licence/reuse caveats;
 - fetch tiny samples manually or with throwaway scripts;
 - write feasibility review.
@@ -395,7 +395,7 @@ Acceptance:
 Tasks:
 
 - create `docs/source_registry.yaml`;
-- create `docs/source_research_notes.md` from the active plan pack's `SOURCE_RESEARCH_NOTES.md`;
+- create `docs/source_research_notes.md`;
 - create `docs/implementation_conventions.md`;
 - create `docs/assumptions_ledger.md`;
 - reference source IDs from assumptions.

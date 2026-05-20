@@ -61,6 +61,25 @@ def test_load_dashboard_cache_reads_phase4_tables(tmp_path: Path) -> None:
     assert cache.eac_commitments["service_model_label"].tolist() == ["dynamic_containment_low"]
     assert cache.data_quality is not None
     assert cache.data_quality["known_at_policy"] == "test_known_at_policy"
+    assert cache.stack_series is not None
+    assert cache.stack_series["basis"].tolist() == ["rolling_policy"]
+
+
+def test_load_dashboard_cache_treats_stack_series_as_optional(tmp_path: Path) -> None:
+    _write_minimal_dashboard_cache(tmp_path, include_stack_series=False)
+    from dashboard.cache_reader import load_dashboard_cache
+
+    cache = load_dashboard_cache(tmp_path)
+
+    assert cache.stack_series is None
+
+
+def test_load_dashboard_cache_rejects_invalid_stack_series_window(tmp_path: Path) -> None:
+    _write_minimal_dashboard_cache(tmp_path, stack_series_window_label="central")
+    from dashboard.cache_reader import DashboardCacheError, load_dashboard_cache
+
+    with pytest.raises(DashboardCacheError, match="Invalid stack_series row 0"):
+        load_dashboard_cache(tmp_path)
 
 
 def test_load_dashboard_cache_missing_files_fails_gracefully(tmp_path: Path) -> None:
@@ -86,9 +105,21 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     assert model["caveats"] == ["Synthetic stress profile."]
     assert model["has_eac_commitments"] is True
     assert model["has_data_quality"] is True
+    assert model["has_stack_series"] is True
+    assert model["stack_story_steps"] == [
+        "Elexon BMRS MID wholesale proxy",
+        "NESO EAC price-taking availability proxy",
+        "Capacity Market annual scenario",
+        "Degradation-adjusted rolling policy",
+    ]
 
 
-def _write_minimal_dashboard_cache(cache_dir: Path) -> None:
+def _write_minimal_dashboard_cache(
+    cache_dir: Path,
+    *,
+    include_stack_series: bool = True,
+    stack_series_window_label: str = "7d",
+) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     (cache_dir / "manifest.json").write_text(
         json.dumps(
@@ -102,6 +133,7 @@ def _write_minimal_dashboard_cache(cache_dir: Path) -> None:
                     "caveats": "caveats.json",
                     "eac_commitments": "eac_commitments.parquet",
                     "data_quality": "data_quality.json",
+                    "stack_series_parquet": "stack_series.parquet",
                 },
             }
         ),
@@ -174,3 +206,21 @@ def _write_minimal_dashboard_cache(cache_dir: Path) -> None:
         ),
         encoding="utf-8",
     )
+    if include_stack_series:
+        pd.DataFrame(
+            [
+                {
+                    "timestamp_utc": "2024-01-01T00:00:00+00:00",
+                    "window_label": stack_series_window_label,
+                    "asset_id": "phase4-commercial-reference",
+                    "basis": "rolling_policy",
+                    "wholesale_energy_gbp": 1200.0,
+                    "eac_availability_gbp": 450.0,
+                    "degradation_cost_gbp": 10.0,
+                    "cm_annual_scenario_gbp_per_mw_year": None,
+                    "caveat_flags": ["not_a_market_index"],
+                    "gross_operating_value_gbp": 1650.0,
+                    "degradation_adjusted_value_gbp": 1640.0,
+                }
+            ]
+        ).to_parquet(cache_dir / "stack_series.parquet", index=False)

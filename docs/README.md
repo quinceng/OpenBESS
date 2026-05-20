@@ -1,8 +1,7 @@
 # Project Documentation Index
 
-This directory materialises the documentation spine defined in the master plan. These files are intended to become the top-level `docs/` directory of the target `gb-bess-revenue-stack` repository.
-
-The governing product plan remains `../GB_BESS_Optimisation_Product_Plan.md`. The phase plans remain the implementation roadmap. The files here expand the durable project rules that should exist before production code is written.
+This directory contains the durable methodology, assumptions, source-boundary
+and release documentation for OpenBESS.
 
 ## Core docs
 
@@ -12,7 +11,7 @@ The governing product plan remains `../GB_BESS_Optimisation_Product_Plan.md`. Th
 - `assumptions_ledger.md`: initial assumption register with source, unit, caveat, sensitivity and verification status.
 - `source_registry.yaml`: machine-readable source registry seed.
 - `data_sources.md`: human-readable source notes and Phase 1 verification instructions.
-- `source_research_notes.md`: compact research-anchor notes to carry into the target repo.
+- `source_research_notes.md`: compact research-anchor notes that explain source choices.
 - `strategic_positioning.md`: durable product edge and differentiation memory.
 - `phase_4_plan.md`: rolling EAC policy and deterministic sweep handoff plan.
 - `phase_5_plan.md`: degradation, finance scenario appraisal and benchmark reconciliation handoff plan.

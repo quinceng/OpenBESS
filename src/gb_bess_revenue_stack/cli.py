@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import csv
 import json
+import math
+from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import typer
+from pydantic import ValidationError
 
 from gb_bess_revenue_stack.commercial import CommercialBessSystem
 from gb_bess_revenue_stack.config.models import AssetConfig
@@ -44,7 +47,7 @@ from gb_bess_revenue_stack.phase4.scenarios import (
     skipped_phase4_smoke_windows,
 )
 from gb_bess_revenue_stack.policies.evaluation import evaluate_rolling_policy
-from gb_bess_revenue_stack.policies.forecasts import OracleForecast, PreviousDaySamePeriodForecast
+from gb_bess_revenue_stack.policies.forecasts import PreviousDaySamePeriodForecast
 from gb_bess_revenue_stack.policies.rolling import RollingConfig, RollingRun, run_rolling_policy
 from gb_bess_revenue_stack.policies.rolling_market_stack import (
     RollingMarketStackRun,
@@ -59,6 +62,7 @@ from gb_bess_revenue_stack.reporting.investor_workbook import (
     InvestorWorkbookInput,
     write_investor_workbook,
 )
+from gb_bess_revenue_stack.reporting.stack_series import StackSeriesRow, write_stack_series
 from gb_bess_revenue_stack.residential import (
     ResidentialHouseholdDispatchInput,
     ResidentialHouseholdDispatchResult,
@@ -438,7 +442,7 @@ def run_phase4_smoke(
         eac_price_matrix=eac_matrix,
         asset=asset,
         initial_soc_mwh=5,
-        forecast_model=OracleForecast(),
+        forecast_model=PreviousDaySamePeriodForecast(),
         config=RollingConfig(
             horizon_periods=horizon_periods,
             step_periods=1,
@@ -510,6 +514,7 @@ def run_phase4_smoke(
             known_at_policy="historical_fixture_source_known_at_policy",
             battery_energy_capacity_mwh=commercial.battery_capacity_mwh,
             battery_power_mw=commercial.effective_export_limit_mw,
+            stack_series_asset_id=commercial.name,
             capex_gbp=commercial.total_capex_gbp,
             finance_assumptions=finance_assumptions,
         ),
@@ -649,6 +654,70 @@ def run_residential_scenario_sweep(
             "Solved residential scenario sweep: "
             f"scenarios={len(results)}, best_payback={best.scenario_name}"
         )
+
+
+@app.command()
+def build_stack_series(
+    cache_dir: Annotated[
+        Path,
+        typer.Option(help="Directory containing cached stack_series.parquet input."),
+    ] = Path("results/dashboard"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for OpenBESS Stack Index CSV/parquet exports."),
+    ] = Path("results/dashboard"),
+) -> None:
+    """Build OpenBESS Stack Index exports from cached stack-series rows."""
+
+    import pandas as pd
+
+    input_path = cache_dir / "stack_series.parquet"
+    if not input_path.is_file():
+        raise typer.BadParameter(f"Missing cached stack series parquet: {input_path}")
+
+    frame = pd.read_parquet(input_path)
+    rows = _validate_stack_series_records(frame.to_dict(orient="records"))
+    paths = write_stack_series(rows, output_dir)
+    typer.echo(
+        "Built OpenBESS Stack Index exports: "
+        f"rows={len(rows)}, parquet={paths['parquet']}, csv={paths['csv']}"
+    )
+
+
+def _validate_stack_series_records(records: list[dict[str, object]]) -> list[StackSeriesRow]:
+    rows: list[StackSeriesRow] = []
+    for row_index, record in enumerate(records):
+        try:
+            rows.append(StackSeriesRow.model_validate(_normalise_stack_series_record(record)))
+        except json.JSONDecodeError as exc:
+            raise typer.BadParameter(
+                f"Invalid stack_series row {row_index}: caveat_flags is not valid JSON."
+            ) from exc
+        except ValidationError as exc:
+            raise typer.BadParameter(
+                f"Invalid stack_series row {row_index}: {exc.errors()[0]['msg']}"
+            ) from exc
+    return rows
+
+
+def _normalise_stack_series_record(record: dict[str, object]) -> dict[str, object]:
+    normalised = dict(record)
+    normalised.pop("gross_operating_value_gbp", None)
+    normalised.pop("degradation_adjusted_value_gbp", None)
+
+    caveat_flags = normalised.get("caveat_flags")
+    if isinstance(caveat_flags, str):
+        normalised["caveat_flags"] = json.loads(caveat_flags)
+    elif caveat_flags is not None and not isinstance(caveat_flags, list):
+        tolist = getattr(caveat_flags, "tolist", None)
+        if callable(tolist):
+            caveat_flags = tolist()
+        normalised["caveat_flags"] = list(cast(Iterable[object], caveat_flags))
+
+    cm_value = normalised.get("cm_annual_scenario_gbp_per_mw_year")
+    if isinstance(cm_value, float) and math.isnan(cm_value):
+        normalised["cm_annual_scenario_gbp_per_mw_year"] = None
+    return normalised
 
 
 def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:

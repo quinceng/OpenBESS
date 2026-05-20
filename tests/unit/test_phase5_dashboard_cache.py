@@ -26,7 +26,7 @@ pytestmark = pytest.mark.unit
 def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     tmp_path: Path,
 ) -> None:
-    write_phase4_dashboard_cache(_phase5_payload(), tmp_path)
+    paths = write_phase4_dashboard_cache(_phase5_payload(), tmp_path)
 
     assert (tmp_path / "degradation_summary.json").exists()
     assert (tmp_path / "finance_summary.json").exists()
@@ -34,6 +34,10 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert (tmp_path / "benchmark_reconciliation.json").exists()
     assert (tmp_path / "eac_commitments.parquet").exists()
     assert (tmp_path / "data_quality.json").exists()
+    assert (tmp_path / "stack_series.parquet").exists()
+    assert (tmp_path / "stack_series.csv").exists()
+    assert paths["stack_series_parquet"] == tmp_path / "stack_series.parquet"
+    assert paths["stack_series_csv"] == tmp_path / "stack_series.csv"
 
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["files"]["degradation_summary"] == "degradation_summary.json"
@@ -41,6 +45,10 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert manifest["files"]["benchmark_reconciliation"] == "benchmark_reconciliation.json"
     assert manifest["files"]["eac_commitments"] == "eac_commitments.parquet"
     assert manifest["files"]["data_quality"] == "data_quality.json"
+    assert manifest["files"]["stack_series_parquet"] == "stack_series.parquet"
+    assert manifest["files"]["stack_series_csv"] == "stack_series.csv"
+    assert "not_a_market_index" in manifest["licence_caveat_flags"]
+    assert "partial_sample_annualised" not in manifest["licence_caveat_flags"]
 
 
 def test_phase5_cache_labels_finance_as_scenario_appraisal_not_bankability(
@@ -55,11 +63,21 @@ def test_phase5_cache_labels_finance_as_scenario_appraisal_not_bankability(
 
     assert finance["finance_scope"] == "illustrative scenario appraisal"
     assert "bankability" not in finance["finance_scope"]
-    assert finance["npv_gbp"] < 0
-    assert set(cashflows["year"]) == set(range(16))
+    assert finance["annualisation_eligible"] is False
+    assert finance["annualised_rolling_revenue_gbp"] is None
+    assert finance["annualised_degradation_cost_gbp"] is None
+    assert finance["npv_gbp"] is None
+    assert finance["simple_payback_year"] is None
+    assert "coverage gates pass" in finance["annualisation_caveat"]
+    assert set(cashflows["year"]) == {0}
     assert degradation["throughput_mwh"] > 0
     assert degradation["equivalent_full_cycles"] > 0
     assert benchmark["reconciliation_scope"] == "benchmark reconciliation, not replication"
+    assert benchmark["model_annualised_rolling_revenue_gbp"] is None
+    assert benchmark["model_annualised_rolling_revenue_gbp_per_mw"] is None
+    assert benchmark["rows"][0]["model_value_gbp_per_mw_year"] is None
+    assert benchmark["rows"][0]["delta_gbp_per_mw_year"] is None
+    assert "partial_sample_annualised" in benchmark["rows"][0]["caveat_labels"]
     assert benchmark["rows"][0]["source_url"].startswith("https://")
     assert benchmark["rows"][0]["access_date"] == "2026-05-19"
     assert benchmark["rows"][0]["methodology_status"] != "unknown_public_anchor_placeholder"
@@ -82,6 +100,7 @@ def test_phase5_finance_outputs_match_hand_calculated_npv_and_payback(
         }
     )
     payload.central_capture.rolling_total_revenue_gbp = 600
+    payload.central_capture.price_period_count = 365 * 48
     payload.central_capture.sample_hours = 8760
 
     write_phase4_dashboard_cache(payload, tmp_path)
@@ -91,6 +110,10 @@ def test_phase5_finance_outputs_match_hand_calculated_npv_and_payback(
     expected_npv = -1000 + 600 / 1.1 + 600 / (1.1**2) + 600 / (1.1**3)
 
     assert finance["npv_gbp"] == pytest.approx(expected_npv)
+    assert finance["annualisation_eligible"] is True
+    assert finance["annualisation_caveat"] == (
+        "Annualised from eligible trailing_12m stack-series coverage window."
+    )
     assert finance["simple_payback_year"] == 2
     assert cashflows.loc[cashflows["year"] == 1, "discounted_cashflow_gbp"].iloc[
         0
@@ -136,6 +159,7 @@ def test_phase5_cache_writes_eac_commitments_and_data_quality(tmp_path: Path) ->
 
     commitments = pd.read_parquet(tmp_path / "eac_commitments.parquet")
     data_quality = json.loads((tmp_path / "data_quality.json").read_text(encoding="utf-8"))
+    stack_windows = data_quality["stack_series_windows"]
 
     assert set(commitments["service_model_label"]) == {"dynamic_containment_low"}
     assert set(commitments["direction"]) == {"up"}
@@ -144,6 +168,110 @@ def test_phase5_cache_writes_eac_commitments_and_data_quality(tmp_path: Path) ->
     assert data_quality["solver_failure_count"] == 0
     assert data_quality["excluded_future_row_count"] == 0
     assert data_quality["source_ids"] == ["PROJECT_CONVENTION"]
+    assert [window["window_label"] for window in stack_windows] == [
+        "7d",
+        "30d",
+        "90d",
+        "ytd",
+        "trailing_12m",
+    ]
+    assert [window["observed_period_count"] for window in stack_windows] == [4, 4, 4, 4, 4]
+    assert [window["expected_period_count"] for window in stack_windows] == [
+        7 * 48,
+        30 * 48,
+        90 * 48,
+        140 * 48,
+        365 * 48,
+    ]
+    assert stack_windows[3]["expected_period_basis"] == (
+        "calendar_ytd_from_created_at_utc_with_minimum_days_floor"
+    )
+    assert all("not_a_market_index" in window["caveat_flags"] for window in stack_windows)
+    assert all(window["eligible_for_public_index"] is False for window in stack_windows)
+
+
+def test_phase5_stack_series_window_eligibility_allows_90d_public_index(
+    tmp_path: Path,
+) -> None:
+    payload = _phase5_payload()
+    payload.central_capture.price_period_count = 90 * 48
+    payload.central_capture.sample_hours = 90 * 24
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    data_quality = json.loads((tmp_path / "data_quality.json").read_text(encoding="utf-8"))
+    stack_series = pd.read_parquet(tmp_path / "stack_series.parquet")
+    windows_by_label = {
+        window["window_label"]: window for window in data_quality["stack_series_windows"]
+    }
+
+    assert windows_by_label["7d"]["eligible_for_public_index"] is False
+    assert windows_by_label["30d"]["eligible_for_public_index"] is False
+    assert windows_by_label["90d"]["eligible_for_public_index"] is True
+    assert "not_a_market_index" in windows_by_label["90d"]["caveat_flags"]
+    assert "partial_sample_annualised" not in windows_by_label["90d"]["caveat_flags"]
+    assert stack_series["window_label"].tolist() == ["90d", "90d"]
+    assert (
+        not stack_series["caveat_flags"]
+        .map(lambda flags: "partial_sample_annualised" in flags)
+        .any()
+    )
+
+
+def test_phase5_stack_series_prefers_trailing_12m_when_ytd_ties(
+    tmp_path: Path,
+) -> None:
+    payload = _phase5_payload()
+    payload.created_at_utc = datetime(2024, 12, 31, tzinfo=UTC)
+    payload.central_capture.price_period_count = 365 * 48
+    payload.central_capture.sample_hours = 365 * 24
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    stack_series = pd.read_parquet(tmp_path / "stack_series.parquet")
+    benchmark = json.loads((tmp_path / "benchmark_reconciliation.json").read_text(encoding="utf-8"))
+
+    assert stack_series["window_label"].tolist() == [
+        "trailing_12m",
+        "trailing_12m",
+    ]
+    assert (
+        not stack_series["caveat_flags"]
+        .map(lambda flags: "partial_sample_annualised" in flags)
+        .any()
+    )
+    assert all("partial_sample_annualised" not in row["caveat_labels"] for row in benchmark["rows"])
+
+
+def test_phase5_cache_writes_stack_series_rows_for_central_aggregate(
+    tmp_path: Path,
+) -> None:
+    write_phase4_dashboard_cache(_phase5_payload(), tmp_path)
+
+    stack_series = pd.read_parquet(tmp_path / "stack_series.parquet")
+
+    assert stack_series["basis"].tolist() == ["perfect_foresight", "rolling_policy"]
+    assert stack_series["window_label"].tolist() == ["7d", "7d"]
+    assert stack_series["asset_id"].tolist() == [
+        "phase5-reference-asset",
+        "phase5-reference-asset",
+    ]
+    assert "openbess_canonical_1mw_2mwh" not in stack_series["asset_id"].tolist()
+    assert stack_series["cm_annual_scenario_gbp_per_mw_year"].isna().all()
+    assert stack_series["caveat_flags"].map(lambda flags: "not_a_market_index" in flags).all()
+    assert (
+        stack_series["caveat_flags"].map(lambda flags: "partial_sample_annualised" in flags).all()
+    )
+
+    perfect = stack_series.loc[stack_series["basis"] == "perfect_foresight"].iloc[0]
+    rolling = stack_series.loc[stack_series["basis"] == "rolling_policy"].iloc[0]
+    assert perfect["wholesale_energy_gbp"] == pytest.approx(240)
+    assert perfect["eac_availability_gbp"] == pytest.approx(60)
+    assert perfect["degradation_cost_gbp"] == pytest.approx(0)
+    assert rolling["wholesale_energy_gbp"] == pytest.approx(200)
+    assert rolling["eac_availability_gbp"] == pytest.approx(50)
+    assert rolling["degradation_cost_gbp"] == pytest.approx(4)
+    assert rolling["degradation_adjusted_value_gbp"] == pytest.approx(200 + 50 - 4)
 
 
 def _phase5_payload() -> Phase4DashboardCacheInput:
@@ -232,6 +360,7 @@ def _phase5_payload() -> Phase4DashboardCacheInput:
         },
         battery_energy_capacity_mwh=2,
         battery_power_mw=1,
+        stack_series_asset_id="phase5-reference-asset",
         capex_gbp=20_000_000,
-        created_at_utc=datetime(2024, 1, 2, tzinfo=UTC),
+        created_at_utc=datetime(2024, 5, 20, tzinfo=UTC),
     )
