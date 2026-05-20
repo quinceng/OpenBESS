@@ -44,6 +44,8 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert (tmp_path / "stack_series_windows.csv").exists()
     assert (tmp_path / "forecast_error_sweeps.parquet").exists()
     assert (tmp_path / "forecast_error_sweeps.csv").exists()
+    assert (tmp_path / "finance_sensitivities.parquet").exists()
+    assert (tmp_path / "finance_sensitivities.csv").exists()
     assert (tmp_path / "assumptions_ledger.json").exists()
     assert (tmp_path / "source_snapshot.json").exists()
     assert (tmp_path / "stack_series.parquet").exists()
@@ -64,12 +66,15 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert manifest["files"]["stack_series_windows_csv"] == "stack_series_windows.csv"
     assert manifest["files"]["forecast_error_sweeps"] == "forecast_error_sweeps.parquet"
     assert manifest["files"]["forecast_error_sweeps_csv"] == "forecast_error_sweeps.csv"
+    assert manifest["files"]["finance_sensitivities"] == "finance_sensitivities.parquet"
+    assert manifest["files"]["finance_sensitivities_csv"] == "finance_sensitivities.csv"
     assert manifest["files"]["assumptions_ledger"] == "assumptions_ledger.json"
     assert manifest["files"]["source_snapshot"] == "source_snapshot.json"
     assert manifest["files"]["stack_series_parquet"] == "stack_series.parquet"
     assert manifest["files"]["stack_series_csv"] == "stack_series.csv"
     assert manifest["stack_series"]["row_count"] == 2
     assert executive_summary["links"]["forecast_error_sweeps"] == ("forecast_error_sweeps.parquet")
+    assert executive_summary["links"]["finance_sensitivities"] == "finance_sensitivities.parquet"
     assert executive_summary["links"]["data_quality_summary_csv"] == "data_quality_summary.csv"
     assert "not_a_market_index" in manifest["licence_caveat_flags"]
     assert "partial_sample_annualised" not in manifest["licence_caveat_flags"]
@@ -162,6 +167,9 @@ def test_phase5_cache_populates_cm_sidecar_and_finance_components(tmp_path: Path
             "finance_assumptions": assumptions,
             "cm_annual_scenario_gbp_per_mw_year": 12_000,
             "cm_scenario_label": "cm_case",
+            "cm_scenario_source_id": "MODO_CM_DERATING_2024_25_ANCHOR",
+            "cm_scenario_source_url": "https://modoenergy.com/research/en/gb-capacity-market-2025-bess-derating-factors-confirmed-target-capacity",
+            "cm_scenario_notes": "Research-anchor derating; scenario/reference sidecar only.",
         }
     )
     payload.central_capture.price_period_count = 90 * 48
@@ -189,6 +197,11 @@ def test_phase5_cache_populates_cm_sidecar_and_finance_components(tmp_path: Path
     assert finance["annual_capacity_market_revenue_gbp"] == pytest.approx(12_000)
     assert finance["annual_fixed_om_gbp"] == pytest.approx(1_000)
     assert finance["cm_scenario_label"] == "cm_case"
+    assert finance["cm_scenario_source_id"] == "MODO_CM_DERATING_2024_25_ANCHOR"
+    assert finance["cm_scenario_caveat"] == (
+        "Capacity Market value is a scenario/reference sidecar, not a central "
+        "official storage-derating result."
+    )
     assert cashflows.loc[cashflows["year"] == 1, "fixed_om_gbp"].iloc[0] == pytest.approx(1_000)
     assert cashflows.loc[cashflows["year"] == 2, "augmentation_capex_gbp"].iloc[0] == pytest.approx(
         500
@@ -196,6 +209,70 @@ def test_phase5_cache_populates_cm_sidecar_and_finance_components(tmp_path: Path
     assert assumptions_ledger["capacity_market"]["treatment"] == (
         "annual sidecar, not settlement-period dispatch revenue"
     )
+    assert assumptions_ledger["capacity_market"]["source_status"] == (
+        "research_anchor_reference_only"
+    )
+
+
+def test_phase5_cache_writes_named_finance_sensitivity_outputs(tmp_path: Path) -> None:
+    assumptions = Phase4FinanceAssumptions(
+        finance_years=3,
+        discount_rate=0.08,
+        annual_revenue_decay_rate=0,
+        degradation_cost_gbp_per_mwh_throughput=2,
+        fixed_om_gbp_per_mw_year=100,
+        augmentation_capex_gbp=300,
+        augmentation_year=2,
+        benchmark_anchors=[],
+    )
+    payload = _phase5_payload().model_copy(
+        update={
+            "capex_gbp": 1_000,
+            "finance_assumptions": assumptions,
+            "cm_annual_scenario_gbp_per_mw_year": 12_000,
+            "cm_scenario_label": "cm_case",
+        }
+    )
+    payload.central_capture.rolling_total_revenue_gbp = 600
+    payload.central_capture.price_period_count = 90 * 48
+    payload.central_capture.sample_hours = 90 * 24
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    sensitivities = pd.read_parquet(tmp_path / "finance_sensitivities.parquet")
+    sensitivities_csv = pd.read_csv(tmp_path / "finance_sensitivities.csv")
+
+    assert sensitivities["case_name"].tolist() == [
+        "low_case",
+        "central_case",
+        "high_case",
+    ]
+    assert set(sensitivities["axis"]) == {"finance_scenario"}
+    assert sensitivities.loc[
+        sensitivities["case_name"] == "central_case",
+        "npv_delta_vs_baseline_gbp",
+    ].iloc[0] == pytest.approx(0)
+    assert (
+        sensitivities.loc[
+            sensitivities["case_name"] == "low_case",
+            "annual_fixed_om_gbp",
+        ].iloc[0]
+        > sensitivities.loc[
+            sensitivities["case_name"] == "central_case",
+            "annual_fixed_om_gbp",
+        ].iloc[0]
+    )
+    assert (
+        sensitivities.loc[
+            sensitivities["case_name"] == "high_case",
+            "annual_capacity_market_revenue_gbp",
+        ].iloc[0]
+        > sensitivities.loc[
+            sensitivities["case_name"] == "central_case",
+            "annual_capacity_market_revenue_gbp",
+        ].iloc[0]
+    )
+    assert sensitivities_csv["case_name"].tolist() == sensitivities["case_name"].tolist()
 
 
 def test_phase5_finance_assumptions_load_from_yaml(tmp_path: Path) -> None:
@@ -207,6 +284,9 @@ def test_phase5_finance_assumptions_load_from_yaml(tmp_path: Path) -> None:
                 "discount_rate: 0.06",
                 "annual_revenue_decay_rate: 0.015",
                 "degradation_cost_gbp_per_mwh_throughput: 4.5",
+                "fixed_om_gbp_per_mw_year: 9000",
+                "augmentation_capex_gbp: 250000",
+                "augmentation_year: 8",
                 "benchmark_anchors:",
                 "  - benchmark_label: Modo GB BESS 2024 average",
                 "    source_id: PUBLIC_BENCHMARK_ANCHORS",
@@ -228,6 +308,9 @@ def test_phase5_finance_assumptions_load_from_yaml(tmp_path: Path) -> None:
     assert assumptions.finance_years == 7
     assert assumptions.discount_rate == pytest.approx(0.06)
     assert assumptions.degradation_cost_gbp_per_mwh_throughput == pytest.approx(4.5)
+    assert assumptions.fixed_om_gbp_per_mw_year == pytest.approx(9000)
+    assert assumptions.augmentation_capex_gbp == pytest.approx(250000)
+    assert assumptions.augmentation_year == 8
     assert assumptions.benchmark_anchors[0].benchmark_value_gbp_per_mw_year == pytest.approx(50_000)
 
 

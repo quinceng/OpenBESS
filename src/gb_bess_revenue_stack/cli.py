@@ -508,7 +508,7 @@ def run_release_cache(
         config=rolling_config,
         scenarios=default_phase4_forecast_error_scenarios(),
     )
-    cm_label, cm_value = _cm_sidecar_for_asset(
+    cm_label, cm_value, cm_source_id, cm_source_url, cm_notes = _cm_sidecar_for_asset(
         cm_scenarios_yaml=cm_scenarios_yaml,
         asset_duration_hours=reference.cm_duration_hours,
     )
@@ -538,6 +538,9 @@ def run_release_cache(
             finance_assumptions=finance_assumptions,
             cm_annual_scenario_gbp_per_mw_year=cm_value,
             cm_scenario_label=cm_label,
+            cm_scenario_source_id=cm_source_id,
+            cm_scenario_source_url=cm_source_url,
+            cm_scenario_notes=cm_notes,
             forecast_error_results=forecast_error_results,
             source_snapshot=aligned.manifest,
         ),
@@ -557,6 +560,9 @@ def run_release_cache(
                 "aligned_cache_dir": str(aligned_cache_dir),
                 "cm_scenario_label": cm_label,
                 "cm_annual_scenario_gbp_per_mw_year": cm_value,
+                "cm_scenario_source_id": cm_source_id,
+                "cm_scenario_source_url": cm_source_url,
+                "cm_scenario_notes": cm_notes,
             },
             indent=2,
         ),
@@ -963,22 +969,28 @@ def _cm_sidecar_for_asset(
     *,
     cm_scenarios_yaml: Path,
     asset_duration_hours: float | None,
-) -> tuple[str | None, float | None]:
+) -> tuple[str | None, float | None, str | None, str | None, str | None]:
     if asset_duration_hours is None or not cm_scenarios_yaml.is_file():
-        return None, None
+        return None, None, None, None, None
     scenarios = [
         scenario
         for scenario in load_cm_scenarios(cm_scenarios_yaml).scenarios
         if abs(scenario.asset_duration_hours - asset_duration_hours) <= 1e-9
     ]
     if not scenarios:
-        return None, None
+        return None, None, None, None, None
     selected = next(
         (scenario for scenario in scenarios if scenario.auction_type == "T-4"),
         scenarios[0],
     )
     annual_value = selected.derating_factor * selected.clearing_price_gbp_per_kw_year * 1000
-    return selected.scenario_name, annual_value
+    return (
+        selected.scenario_name,
+        annual_value,
+        selected.source_id,
+        selected.source_url,
+        selected.notes,
+    )
 
 
 def _load_fixture_prices(path: Path) -> list[WholesalePricePoint]:

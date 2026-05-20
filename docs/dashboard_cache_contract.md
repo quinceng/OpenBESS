@@ -49,6 +49,8 @@ results/dashboard/eac_commitments.parquet
 results/dashboard/scenario_sweeps.parquet
 results/dashboard/scenario_sweeps.csv
 results/dashboard/finance_cashflows.parquet
+results/dashboard/finance_sensitivities.parquet
+results/dashboard/finance_sensitivities.csv
 results/dashboard/stack_series.parquet
 results/dashboard/stack_series.csv
 results/dashboard/forecast_error_sweeps.parquet
@@ -77,6 +79,8 @@ results/dashboard/scenario_sweeps.csv
 results/dashboard/degradation_summary.json
 results/dashboard/finance_summary.json
 results/dashboard/finance_cashflows.parquet
+results/dashboard/finance_sensitivities.parquet
+results/dashboard/finance_sensitivities.csv
 results/dashboard/stack_series.parquet
 results/dashboard/stack_series.csv
 results/dashboard/forecast_error_sweeps.parquet
@@ -105,6 +109,11 @@ must preserve `not_a_market_index`.
 deterministic rolling-policy sensitivities for biased or scaled wholesale
 forecasts. These rows are diagnostics for forecast imperfection and are not
 headline market values.
+
+`finance_sensitivities.parquet` and `finance_sensitivities.csv` record
+dashboard-visible low/central/high finance scenario rows. They compare fixed
+O&M, augmentation timing/cost, discount-rate, degradation-cost and Capacity
+Market sidecar assumptions against the central configured baseline.
 
 `assumptions_ledger.json` records the asset, finance, Capacity Market,
 known-at and caveat assumptions used by the cache. `source_snapshot.json`

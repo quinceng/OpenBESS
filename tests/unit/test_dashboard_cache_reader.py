@@ -69,6 +69,8 @@ def test_load_dashboard_cache_reads_phase4_tables(tmp_path: Path) -> None:
     assert cache.data_quality_summary["price_period_count"].tolist() == [336]
     assert cache.assumptions_ledger is not None
     assert cache.source_snapshot is not None
+    assert cache.finance_sensitivities is not None
+    assert cache.finance_sensitivities["case_name"].tolist() == ["central_case"]
 
 
 def test_load_dashboard_cache_treats_stack_series_as_optional(tmp_path: Path) -> None:
@@ -123,6 +125,7 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     assert model["has_eac_commitments"] is True
     assert model["has_data_quality"] is True
     assert model["has_stack_series"] is True
+    assert model["has_finance_sensitivities"] is True
     assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
     assert model["stack_index"]["primary_window_label"] == "7d"
     assert model["stack_index"]["primary_coverage_pct"] == pytest.approx(1.0)
@@ -150,6 +153,7 @@ def _write_minimal_dashboard_cache(
         "caveats": "caveats.json",
         "eac_commitments": "eac_commitments.parquet",
         "data_quality": "data_quality.json",
+        "finance_sensitivities": "finance_sensitivities.parquet",
     }
     if include_stack_series:
         files["stack_series_parquet"] = "stack_series.parquet"
@@ -212,6 +216,16 @@ def _write_minimal_dashboard_cache(
             }
         ]
     ).to_parquet(cache_dir / "scenario_sweeps.parquet", index=False)
+    pd.DataFrame(
+        [
+            {
+                "case_name": "central_case",
+                "axis": "finance_scenario",
+                "npv_gbp": 12_500.0,
+                "npv_delta_vs_baseline_gbp": 0.0,
+            }
+        ]
+    ).to_parquet(cache_dir / "finance_sensitivities.parquet", index=False)
     (cache_dir / "caveats.json").write_text(
         json.dumps({"caveats": ["Synthetic stress profile."]}),
         encoding="utf-8",

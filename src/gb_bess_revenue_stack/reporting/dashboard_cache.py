@@ -39,6 +39,10 @@ EAC_COMMITMENT_COLUMNS = [
     "committed_mw",
     "executed_period_count",
 ]
+CM_REFERENCE_SIDECAR_CAVEAT = (
+    "Capacity Market value is a scenario/reference sidecar, not a central "
+    "official storage-derating result."
+)
 
 
 class PublicBenchmarkAnchor(BaseModel):
@@ -99,6 +103,29 @@ def default_public_benchmark_anchors() -> list[PublicBenchmarkAnchor]:
     ]
 
 
+class FinanceSensitivityCase(BaseModel):
+    """Named finance sensitivity override for dashboard comparison rows."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    case_name: str = Field(min_length=1)
+    description: str
+    discount_rate: float | None = Field(default=None, ge=0)
+    annual_revenue_decay_rate: float | None = Field(default=None, ge=0, le=1)
+    degradation_cost_scalar: float = Field(default=1.0, ge=0)
+    fixed_om_gbp_per_mw_year: float | None = Field(default=None, ge=0)
+    augmentation_capex_gbp: float | None = Field(default=None, ge=0)
+    augmentation_year: int | None = Field(default=None, ge=1)
+    cm_revenue_scalar: float = Field(default=1.0, ge=0)
+
+    @model_validator(mode="after")
+    def augmentation_fields_are_paired(self) -> FinanceSensitivityCase:
+        if (self.augmentation_capex_gbp is None) != (self.augmentation_year is None):
+            msg = "augmentation_capex_gbp and augmentation_year must be supplied together."
+            raise ValueError(msg)
+        return self
+
+
 class Phase4FinanceAssumptions(BaseModel):
     """Configurable Phase 5 finance and benchmark assumptions."""
 
@@ -111,6 +138,7 @@ class Phase4FinanceAssumptions(BaseModel):
     fixed_om_gbp_per_mw_year: float = Field(default=0.0, ge=0)
     augmentation_capex_gbp: float | None = Field(default=None, ge=0)
     augmentation_year: int | None = Field(default=None, ge=1)
+    sensitivity_cases: list[FinanceSensitivityCase] = Field(default_factory=list)
     benchmark_anchors: list[PublicBenchmarkAnchor] = Field(
         default_factory=default_public_benchmark_anchors
     )
@@ -179,6 +207,9 @@ class Phase4DashboardCacheInput(BaseModel):
     capex_gbp: float | None = Field(default=None, ge=0)
     cm_annual_scenario_gbp_per_mw_year: float | None = Field(default=None, ge=0)
     cm_scenario_label: str | None = None
+    cm_scenario_source_id: str | None = None
+    cm_scenario_source_url: str | None = None
+    cm_scenario_notes: str | None = None
     finance_assumptions: Phase4FinanceAssumptions = Field(default_factory=Phase4FinanceAssumptions)
     forecast_error_results: list[Phase4ForecastErrorSweepResult] = Field(default_factory=list)
     source_snapshot: dict[str, Any] | None = None
@@ -210,6 +241,8 @@ def write_phase4_dashboard_cache(
         "degradation_summary": cache_dir / "degradation_summary.json",
         "finance_summary": cache_dir / "finance_summary.json",
         "finance_cashflows": cache_dir / "finance_cashflows.parquet",
+        "finance_sensitivities": cache_dir / "finance_sensitivities.parquet",
+        "finance_sensitivities_csv": cache_dir / "finance_sensitivities.csv",
         "benchmark_reconciliation": cache_dir / "benchmark_reconciliation.json",
         "eac_commitments": cache_dir / "eac_commitments.parquet",
         "data_quality": cache_dir / "data_quality.json",
@@ -253,6 +286,11 @@ def write_phase4_dashboard_cache(
     _write_json(paths["degradation_summary"], degradation)
     _write_json(paths["finance_summary"], finance_summary)
     pd.DataFrame(finance_cashflows).to_parquet(paths["finance_cashflows"], index=False)
+    _write_frame_pair(
+        pd.DataFrame(_finance_sensitivity_rows(payload, degradation, finance_summary)),
+        parquet_path=paths["finance_sensitivities"],
+        csv_path=paths["finance_sensitivities_csv"],
+    )
     _write_json(paths["benchmark_reconciliation"], benchmark)
     pd.DataFrame(_eac_commitment_rows(payload), columns=EAC_COMMITMENT_COLUMNS).to_parquet(
         paths["eac_commitments"],
@@ -339,6 +377,8 @@ def _executive_summary(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
             "stack_series_csv": "stack_series.csv",
             "forecast_error_sweeps": "forecast_error_sweeps.parquet",
             "forecast_error_sweeps_csv": "forecast_error_sweeps.csv",
+            "finance_sensitivities": "finance_sensitivities.parquet",
+            "finance_sensitivities_csv": "finance_sensitivities.csv",
             "data_quality": "data_quality.json",
             "data_quality_summary_csv": "data_quality_summary.csv",
             "stack_series_windows_csv": "stack_series_windows.csv",
@@ -520,6 +560,11 @@ def _finance_outputs(
                 "annualised_degradation_cost_gbp": None,
                 "annual_fixed_om_gbp": None,
                 "annual_capacity_market_revenue_gbp": None,
+                "cm_scenario_label": payload.cm_scenario_label,
+                "cm_scenario_source_id": payload.cm_scenario_source_id,
+                "cm_scenario_source_url": payload.cm_scenario_source_url,
+                "cm_scenario_notes": payload.cm_scenario_notes,
+                "cm_scenario_caveat": _cm_scenario_caveat(payload),
                 "npv_gbp": None,
                 "simple_payback_year": None,
                 "payback_definition": "first year cumulative undiscounted cashflow is non-negative",
@@ -599,6 +644,10 @@ def _finance_outputs(
             "annual_fixed_om_gbp": annual_fixed_om,
             "annual_capacity_market_revenue_gbp": annual_cm_revenue,
             "cm_scenario_label": payload.cm_scenario_label,
+            "cm_scenario_source_id": payload.cm_scenario_source_id,
+            "cm_scenario_source_url": payload.cm_scenario_source_url,
+            "cm_scenario_notes": payload.cm_scenario_notes,
+            "cm_scenario_caveat": _cm_scenario_caveat(payload),
             "npv_gbp": npv,
             "simple_payback_year": payback_year,
             "payback_definition": "first year cumulative undiscounted cashflow is non-negative",
@@ -614,6 +663,247 @@ def _finance_outputs(
         },
         rows,
     )
+
+
+def _finance_sensitivity_rows(
+    payload: Phase4DashboardCacheInput,
+    degradation: dict[str, Any],
+    finance_summary: dict[str, Any],
+) -> list[dict[str, Any]]:
+    assumptions = payload.finance_assumptions
+    if assumptions.sensitivity_cases:
+        rows = [
+            _finance_case_row(
+                payload=payload,
+                degradation=degradation,
+                assumptions=assumptions.model_copy(
+                    update={
+                        "discount_rate": case.discount_rate
+                        if case.discount_rate is not None
+                        else assumptions.discount_rate,
+                        "annual_revenue_decay_rate": (
+                            case.annual_revenue_decay_rate
+                            if case.annual_revenue_decay_rate is not None
+                            else assumptions.annual_revenue_decay_rate
+                        ),
+                        "fixed_om_gbp_per_mw_year": (
+                            case.fixed_om_gbp_per_mw_year
+                            if case.fixed_om_gbp_per_mw_year is not None
+                            else assumptions.fixed_om_gbp_per_mw_year
+                        ),
+                        "augmentation_capex_gbp": (
+                            case.augmentation_capex_gbp
+                            if case.augmentation_capex_gbp is not None
+                            else assumptions.augmentation_capex_gbp
+                        ),
+                        "augmentation_year": (
+                            case.augmentation_year
+                            if case.augmentation_year is not None
+                            else assumptions.augmentation_year
+                        ),
+                    }
+                ),
+                case_name=case.case_name,
+                description=case.description,
+                cm_revenue_scalar=case.cm_revenue_scalar,
+                degradation_cost_scalar=case.degradation_cost_scalar,
+            )
+            for case in assumptions.sensitivity_cases
+        ]
+        baseline_npv = finance_summary.get("npv_gbp")
+        for row in rows:
+            row["baseline_npv_gbp"] = baseline_npv
+            row["npv_delta_vs_baseline_gbp"] = (
+                None
+                if row["npv_gbp"] is None or baseline_npv is None
+                else row["npv_gbp"] - baseline_npv
+            )
+        return rows
+
+    central_case = _finance_case_row(
+        payload=payload,
+        degradation=degradation,
+        assumptions=assumptions,
+        case_name="central_case",
+        description="Configured central finance assumptions.",
+        cm_revenue_scalar=1.0,
+        degradation_cost_scalar=1.0,
+    )
+    baseline_npv = finance_summary.get("npv_gbp")
+    if baseline_npv is None:
+        baseline_npv = central_case["npv_gbp"]
+
+    fixed_om = assumptions.fixed_om_gbp_per_mw_year
+    if payload.battery_power_mw is None:
+        low_fixed_om = 0.0
+        high_fixed_om = 0.0
+    else:
+        low_fixed_om = max(fixed_om * 1.5, fixed_om + 1_000)
+        high_fixed_om = fixed_om * 0.75
+    low_aug_capex = (
+        None
+        if assumptions.augmentation_capex_gbp is None
+        else assumptions.augmentation_capex_gbp * 1.25
+    )
+    high_aug_capex = (
+        None
+        if assumptions.augmentation_capex_gbp is None
+        else assumptions.augmentation_capex_gbp * 0.75
+    )
+    low_aug_year = (
+        None if assumptions.augmentation_year is None else max(1, assumptions.augmentation_year - 1)
+    )
+    high_aug_year = (
+        None
+        if assumptions.augmentation_year is None
+        else min(assumptions.finance_years, assumptions.augmentation_year + 1)
+    )
+    cases = [
+        _finance_case_row(
+            payload=payload,
+            degradation=degradation,
+            assumptions=assumptions.model_copy(
+                update={
+                    "discount_rate": assumptions.discount_rate + 0.02,
+                    "annual_revenue_decay_rate": min(
+                        1.0, assumptions.annual_revenue_decay_rate + 0.02
+                    ),
+                    "fixed_om_gbp_per_mw_year": low_fixed_om,
+                    "augmentation_capex_gbp": low_aug_capex,
+                    "augmentation_year": low_aug_year,
+                }
+            ),
+            case_name="low_case",
+            description=(
+                "Downside finance sensitivity with higher discount rate, fixed O&M, "
+                "degradation cost and earlier augmentation."
+            ),
+            cm_revenue_scalar=0.75,
+            degradation_cost_scalar=1.5,
+        ),
+        central_case,
+        _finance_case_row(
+            payload=payload,
+            degradation=degradation,
+            assumptions=assumptions.model_copy(
+                update={
+                    "discount_rate": max(0.0, assumptions.discount_rate - 0.02),
+                    "annual_revenue_decay_rate": max(
+                        0.0, assumptions.annual_revenue_decay_rate - 0.01
+                    ),
+                    "fixed_om_gbp_per_mw_year": high_fixed_om,
+                    "augmentation_capex_gbp": high_aug_capex,
+                    "augmentation_year": high_aug_year,
+                }
+            ),
+            case_name="high_case",
+            description=(
+                "Upside finance sensitivity with lower discount rate, lower fixed O&M, "
+                "lower degradation cost and higher CM sidecar."
+            ),
+            cm_revenue_scalar=1.25,
+            degradation_cost_scalar=0.75,
+        ),
+    ]
+    for row in cases:
+        row["baseline_npv_gbp"] = baseline_npv
+        row["npv_delta_vs_baseline_gbp"] = (
+            None
+            if row["npv_gbp"] is None or baseline_npv is None
+            else row["npv_gbp"] - baseline_npv
+        )
+    return cases
+
+
+def _finance_case_row(
+    *,
+    payload: Phase4DashboardCacheInput,
+    degradation: dict[str, Any],
+    assumptions: Phase4FinanceAssumptions,
+    case_name: str,
+    description: str,
+    cm_revenue_scalar: float,
+    degradation_cost_scalar: float,
+) -> dict[str, Any]:
+    if assumptions.fixed_om_gbp_per_mw_year > 0 and payload.battery_power_mw is None:
+        msg = "battery_power_mw is required when fixed O&M is configured per MW."
+        raise ValueError(msg)
+
+    common = {
+        "case_name": case_name,
+        "axis": "finance_scenario",
+        "description": description,
+        "finance_years": assumptions.finance_years,
+        "discount_rate": assumptions.discount_rate,
+        "annual_revenue_decay_rate": assumptions.annual_revenue_decay_rate,
+        "degradation_cost_scalar": degradation_cost_scalar,
+        "cm_revenue_scalar": cm_revenue_scalar,
+        "augmentation_capex_gbp": assumptions.augmentation_capex_gbp,
+        "augmentation_year": assumptions.augmentation_year,
+        "cm_scenario_label": payload.cm_scenario_label,
+        "cm_scenario_caveat": _cm_scenario_caveat(payload),
+    }
+    if not _annualisation_eligible(payload):
+        return {
+            **common,
+            "annual_market_revenue_gbp": None,
+            "annual_degradation_cost_gbp": None,
+            "annual_fixed_om_gbp": None,
+            "annual_capacity_market_revenue_gbp": None,
+            "npv_gbp": None,
+            "simple_payback_year": None,
+            "baseline_npv_gbp": None,
+            "npv_delta_vs_baseline_gbp": None,
+        }
+
+    annualisation_factor = (
+        8760 / payload.central_capture.sample_hours
+        if payload.central_capture.sample_hours > 0
+        else 0.0
+    )
+    annual_market_revenue = payload.central_capture.rolling_total_revenue_gbp * annualisation_factor
+    base_cm_revenue = (
+        0.0
+        if payload.cm_annual_scenario_gbp_per_mw_year is None or payload.battery_power_mw is None
+        else payload.cm_annual_scenario_gbp_per_mw_year * payload.battery_power_mw
+    )
+    annual_cm_revenue = base_cm_revenue * cm_revenue_scalar
+    annual_fixed_om = assumptions.fixed_om_gbp_per_mw_year * (payload.battery_power_mw or 0.0)
+    annual_degradation_cost = (
+        float(degradation["degradation_cost_gbp"]) * annualisation_factor * degradation_cost_scalar
+    )
+    capex = payload.capex_gbp or 0.0
+    cumulative = -capex
+    npv = -capex
+    payback_year = None
+    for year in range(1, assumptions.finance_years + 1):
+        market_revenue = annual_market_revenue * (1 - assumptions.annual_revenue_decay_rate) ** (
+            year - 1
+        )
+        gross = market_revenue + annual_cm_revenue
+        augmentation_capex = (
+            assumptions.augmentation_capex_gbp
+            if assumptions.augmentation_year == year
+            and assumptions.augmentation_capex_gbp is not None
+            else 0.0
+        )
+        net = gross - annual_degradation_cost - annual_fixed_om - augmentation_capex
+        cumulative += net
+        npv += net / (1 + assumptions.discount_rate) ** year
+        if payback_year is None and cumulative >= 0:
+            payback_year = year
+
+    return {
+        **common,
+        "annual_market_revenue_gbp": annual_market_revenue,
+        "annual_degradation_cost_gbp": annual_degradation_cost,
+        "annual_fixed_om_gbp": annual_fixed_om,
+        "annual_capacity_market_revenue_gbp": annual_cm_revenue,
+        "npv_gbp": npv,
+        "simple_payback_year": payback_year,
+        "baseline_npv_gbp": None,
+        "npv_delta_vs_baseline_gbp": None,
+    }
 
 
 def _benchmark_reconciliation(
@@ -869,6 +1159,11 @@ def _assumptions_ledger(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
         "capacity_market": {
             "cm_scenario_label": payload.cm_scenario_label,
             "cm_annual_scenario_gbp_per_mw_year": (payload.cm_annual_scenario_gbp_per_mw_year),
+            "source_id": payload.cm_scenario_source_id,
+            "source_url": payload.cm_scenario_source_url,
+            "notes": payload.cm_scenario_notes,
+            "source_status": _cm_source_status(payload),
+            "caveat": _cm_scenario_caveat(payload),
             "treatment": "annual sidecar, not settlement-period dispatch revenue",
         },
         "known_at_policy": payload.known_at_policy,
@@ -886,6 +1181,35 @@ def _source_snapshot(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
         "known_at_policy": payload.known_at_policy,
         "created_at_utc": payload.created_at_utc.isoformat(),
     }
+
+
+def _cm_scenario_caveat(payload: Phase4DashboardCacheInput) -> str | None:
+    if payload.cm_annual_scenario_gbp_per_mw_year is None and payload.cm_scenario_label is None:
+        return None
+    return CM_REFERENCE_SIDECAR_CAVEAT
+
+
+def _cm_source_status(payload: Phase4DashboardCacheInput) -> str | None:
+    if payload.cm_annual_scenario_gbp_per_mw_year is None and payload.cm_scenario_label is None:
+        return None
+    source_text = " ".join(
+        item
+        for item in (
+            payload.cm_scenario_source_id,
+            payload.cm_scenario_source_url,
+            payload.cm_scenario_notes,
+        )
+        if item
+    ).lower()
+    if (
+        "modo" in source_text
+        or "research-anchor" in source_text
+        or "research anchor" in source_text
+    ):
+        return "research_anchor_reference_only"
+    if "official" in source_text or "gov.uk" in source_text or "neso" in source_text:
+        return "official_reference_sidecar"
+    return "scenario_reference_sidecar"
 
 
 def _write_frame_pair(frame: pd.DataFrame, *, parquet_path: Path, csv_path: Path) -> None:

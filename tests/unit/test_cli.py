@@ -77,13 +77,16 @@ def test_cli_exposes_run_release_cache_subcommand() -> None:
 
 
 def test_cm_sidecar_selects_matching_duration_t4_scenario() -> None:
-    label, annual_value = _cm_sidecar_for_asset(
+    label, annual_value, source_id, source_url, notes = _cm_sidecar_for_asset(
         cm_scenarios_yaml=Path("configs/scenarios_cm.yaml"),
         asset_duration_hours=2,
     )
 
     assert label == "t4_2028_29_two_hour_research_anchor"
     assert annual_value == pytest.approx(0.2094 * 60.0 * 1000)
+    assert source_id == "MODO_CM_DERATING_2024_25_ANCHOR"
+    assert source_url.startswith("https://modoenergy.com/")
+    assert "scenario/reference sidecar only" in notes
 
 
 def test_cli_exposes_run_residential_household_smoke_subcommand() -> None:

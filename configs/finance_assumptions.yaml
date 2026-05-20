@@ -2,9 +2,37 @@ finance_years: 15
 discount_rate: 0.08
 annual_revenue_decay_rate: 0.02
 degradation_cost_gbp_per_mwh_throughput: 2.0
-fixed_om_gbp_per_mw_year: 0.0
-augmentation_capex_gbp: null
-augmentation_year: null
+fixed_om_gbp_per_mw_year: 9000.0
+augmentation_capex_gbp: 250000.0
+augmentation_year: 8
+sensitivity_cases:
+  - case_name: low_case
+    description: Downside case with higher fixed O&M, earlier augmentation, higher discount rate and lower CM sidecar.
+    discount_rate: 0.10
+    annual_revenue_decay_rate: 0.04
+    degradation_cost_scalar: 1.5
+    fixed_om_gbp_per_mw_year: 12000.0
+    augmentation_capex_gbp: 300000.0
+    augmentation_year: 7
+    cm_revenue_scalar: 0.75
+  - case_name: central_case
+    description: Configured central case for the OpenBESS canonical 1MW/2MWh reference asset.
+    discount_rate: 0.08
+    annual_revenue_decay_rate: 0.02
+    degradation_cost_scalar: 1.0
+    fixed_om_gbp_per_mw_year: 9000.0
+    augmentation_capex_gbp: 250000.0
+    augmentation_year: 8
+    cm_revenue_scalar: 1.0
+  - case_name: high_case
+    description: Upside case with lower fixed O&M, later/lower augmentation, lower discount rate and higher CM sidecar.
+    discount_rate: 0.06
+    annual_revenue_decay_rate: 0.01
+    degradation_cost_scalar: 0.75
+    fixed_om_gbp_per_mw_year: 6500.0
+    augmentation_capex_gbp: 200000.0
+    augmentation_year: 9
+    cm_revenue_scalar: 1.25
 benchmark_anchors:
   - benchmark_label: Modo GB BESS 2024 average
     source_id: PUBLIC_BENCHMARK_ANCHORS

@@ -150,6 +150,9 @@ sources:
     access:
       type: official_publication
       url: https://www.gov.uk/government/publications/capacity-market-auction-parameters-letter-from-desnz-to-neso-february-2025/final-auction-parameters-t-1-and-t-4-capacity-market-auctions
+      scheme_update_2025: https://www.gov.uk/government/publications/contracts-for-difference-and-capacity-market-scheme-update-2025
+      scheme_update_2025_title: Contracts for Difference and Capacity Market scheme update 2025
+      neso_capacity_market_page: https://www.neso.energy/what-we-do/energy-markets/electricity-market-reform-emr-delivery-body/capacity-market
       auction_monitor_t4_2028_29: https://assets.publishing.service.gov.uk/media/67d44b1db1e34f07631b5bf8/t4-2024-for-delivery-2028-2029-auction-monitor-report.pdf
     expected_fields:
       - auction_type
@@ -161,7 +164,9 @@ sources:
       Auction parameters and clearing-price publications are verified. Duration-specific
       storage derating remains usable only as sourced scenario/reference data until a
       selected official auction guideline workbook or equivalent machine-readable source is
-      added. Secondary research articles may remain anchors only.
+      added. Secondary research articles may remain anchors only, and the Release 1
+      Modo BESS derating values are reference sidecars rather than central official
+      storage-derating results.
     licence: Open Government Licence v3.0 for GOV.UK pages unless otherwise stated
     phase1_decision: usable_for_cm_scenario_reference_with_derating_caveat
 
@@ -181,7 +186,8 @@ sources:
       t4_2h_bess_derating: 0.2094
     caveat: >
       These values are article anchors for the cited auction cycle, not timeless
-      constants. Prefer official values before central runs.
+      constants. They remain scenario/reference sidecars only; prefer official values
+      before central runs.
 
   - source_id: PUBLIC_BENCHMARK_ANCHORS
     name: Public battery revenue benchmark anchors

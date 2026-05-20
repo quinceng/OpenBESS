@@ -10,7 +10,7 @@ scenarios:
     source_id: MODO_CM_DERATING_2024_25_ANCHOR
     source_url: https://modoenergy.com/research/en/gb-capacity-market-2025-bess-derating-factors-confirmed-target-capacity
     source_date: "2024-08-12"
-    notes: Research-anchor 2h BESS derating only; not a central official derating default.
+    notes: Research-anchor 2h BESS derating; scenario/reference sidecar only, not a central official storage-derating result.
   - scenario_name: t4_2028_29_two_hour_research_anchor
     auction_type: T-4
     delivery_year: 2028/29
@@ -21,4 +21,4 @@ scenarios:
     source_id: MODO_CM_DERATING_2024_25_ANCHOR
     source_url: https://modoenergy.com/research/en/gb-capacity-market-2025-bess-derating-factors-confirmed-target-capacity
     source_date: "2024-08-12"
-    notes: Research-anchor 2h BESS derating only; not a central official derating default.
+    notes: Research-anchor 2h BESS derating; scenario/reference sidecar only, not a central official storage-derating result.

@@ -49,6 +49,7 @@ def build_view_model(cache: DashboardCache) -> dict[str, Any]:
         "has_data_quality": cache.data_quality is not None,
         "has_stack_series": cache.stack_series is not None,
         "has_forecast_error_sweeps": cache.forecast_error_sweeps is not None,
+        "has_finance_sensitivities": cache.finance_sensitivities is not None,
         "stack_index": _stack_index_view(cache),
         "stack_story_steps": STACK_STORY_STEPS,
     }
@@ -148,6 +149,7 @@ def _render_phase5(st: Any, cache: DashboardCache) -> None:
         cache.degradation_summary is None
         and cache.finance_summary is None
         and cache.benchmark_reconciliation is None
+        and cache.finance_sensitivities is None
     ):
         return
     st.subheader("Phase 5 Illustrative Outputs")
@@ -164,6 +166,8 @@ def _render_phase5(st: Any, cache: DashboardCache) -> None:
         st.caption(str(cache.finance_summary.get("not_bankability_statement", "")))
     if cache.finance_cashflows is not None:
         st.dataframe(cache.finance_cashflows, hide_index=True, use_container_width=True)
+    if cache.finance_sensitivities is not None and not cache.finance_sensitivities.empty:
+        st.dataframe(cache.finance_sensitivities, hide_index=True, use_container_width=True)
     if cache.benchmark_reconciliation is not None:
         st.json(cache.benchmark_reconciliation)
 

@@ -25,17 +25,17 @@ def test_source_registry_has_phase1_gate_decisions() -> None:
     assert "phase1_verify" not in yaml.safe_dump(sources["NESO_EAC_AUCTION_RESULTS"])
 
 
-def test_phase_reviews_exist_and_record_gate_decisions() -> None:
-    feasibility = ROOT / "docs/phase_reviews/p1_00_source_feasibility.md"
-    phase_review = ROOT / "docs/phase_reviews/phase_1_review.md"
-
-    assert feasibility.exists()
-    assert phase_review.exists()
-    assert (
-        "production client build may proceed with caveats"
-        in feasibility.read_text(encoding="utf-8").lower()
-    )
-    assert "proceed with caveat" in phase_review.read_text(encoding="utf-8").lower()
+def test_public_explanatory_docs_exist() -> None:
+    for relative_path in [
+        "README.md",
+        "docs/README.md",
+        "docs/methodology.md",
+        "docs/model_boundaries.md",
+        "docs/openbess_stack_index.md",
+        "docs/reproducibility.md",
+        "docs/known_limitations.md",
+    ]:
+        assert (ROOT / relative_path).exists()
 
 
 def test_capacity_market_reference_scenarios_validate() -> None:
@@ -63,16 +63,23 @@ def test_capacity_market_reference_scenarios_validate() -> None:
     }
 
 
-def test_release_docs_record_historical_phase4_and_residential_scenario_sweeps() -> None:
-    phase4_plan = (ROOT / "docs/phase_4_plan.md").read_text(encoding="utf-8")
-    release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
+def test_public_residential_doc_records_scenario_sweeps() -> None:
     residential_assumptions = (ROOT / "docs/residential_bess_assumptions.md").read_text(
         encoding="utf-8"
     )
 
-    assert "aligned historical Elexon/NESO sample" in phase4_plan
-    assert "Phase 4 default smoke sample is historical" in release_checklist
     assert "Residential Scenario Sweeps" in residential_assumptions
+
+
+def test_capacity_market_caveat_is_closed_as_reference_sidecar() -> None:
+    cm_config = (ROOT / "configs/scenarios_cm.yaml").read_text(encoding="utf-8")
+    source_registry = (ROOT / "docs/source_registry.yaml").read_text(encoding="utf-8")
+    methodology = (ROOT / "docs/methodology.md").read_text(encoding="utf-8")
+
+    assert "scenario/reference sidecar only" in cm_config
+    assert "not a central official storage-derating result" in cm_config
+    assert "Contracts for Difference and Capacity Market scheme update 2025" in source_registry
+    assert "CM research-anchor derating values remain reference sidecars" in methodology
 
 
 def test_release_hardening_files_exist() -> None:
@@ -120,12 +127,9 @@ def test_openbess_stack_index_public_doc_records_required_boundary_language() ->
 def test_openbess_stack_index_is_referenced_by_boundary_docs() -> None:
     methodology = (ROOT / "docs/methodology.md").read_text(encoding="utf-8")
     model_boundaries = (ROOT / "docs/model_boundaries.md").read_text(encoding="utf-8")
-    product_plan = (ROOT / "docs/product_plan.md").read_text(encoding="utf-8")
     cache_contract = (ROOT / "docs/dashboard_cache_contract.md").read_text(encoding="utf-8")
-    release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
 
     assert "openbess_stack_index.md" in methodology
-    assert "OpenBESS Stack Index" in product_plan
     assert "not_a_market_index" in model_boundaries
     assert "not_a_market_index" in cache_contract
     assert "stack_series.parquet" in cache_contract
@@ -135,4 +139,3 @@ def test_openbess_stack_index_is_referenced_by_boundary_docs() -> None:
     assert "asset actually solved in the cache" in cache_contract
     assert "duplicate fixed 90-day" in cache_contract
     assert "suppressed/null until stack-series coverage gates pass" in cache_contract
-    assert "preview labelling" in release_checklist

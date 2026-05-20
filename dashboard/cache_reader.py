@@ -22,6 +22,7 @@ OPTIONAL_FILES = {
     "degradation_summary": "degradation_summary.json",
     "finance_summary": "finance_summary.json",
     "finance_cashflows": "finance_cashflows.parquet",
+    "finance_sensitivities": "finance_sensitivities.parquet",
     "benchmark_reconciliation": "benchmark_reconciliation.json",
     "eac_commitments": "eac_commitments.parquet",
     "data_quality": "data_quality.json",
@@ -67,6 +68,7 @@ class DashboardCache:
     degradation_summary: dict[str, Any] | None = None
     finance_summary: dict[str, Any] | None = None
     finance_cashflows: pd.DataFrame | None = None
+    finance_sensitivities: pd.DataFrame | None = None
     benchmark_reconciliation: dict[str, Any] | None = None
     eac_commitments: pd.DataFrame | None = None
     data_quality: dict[str, Any] | None = None
@@ -107,6 +109,9 @@ def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Dashboard
             degradation_summary=_read_optional_json(root / OPTIONAL_FILES["degradation_summary"]),
             finance_summary=_read_optional_json(root / OPTIONAL_FILES["finance_summary"]),
             finance_cashflows=_read_optional_parquet(root / OPTIONAL_FILES["finance_cashflows"]),
+            finance_sensitivities=_read_optional_parquet(
+                root / OPTIONAL_FILES["finance_sensitivities"]
+            ),
             benchmark_reconciliation=_read_optional_json(
                 root / OPTIONAL_FILES["benchmark_reconciliation"]
             ),

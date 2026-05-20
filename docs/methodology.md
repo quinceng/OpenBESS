@@ -136,6 +136,11 @@ cm_revenue_year =
 
 CM is not a settlement-period dispatch product.
 
+CM research-anchor derating values remain reference sidecars. Official
+auction-parameter and clearing-result publications can support Capacity Market
+scenario context, but Release 1 does not treat secondary BESS derating anchors as
+central official storage-derating results.
+
 ## 8. Degradation
 
 Central degradation proxy:

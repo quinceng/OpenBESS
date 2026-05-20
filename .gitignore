@@ -12,5 +12,14 @@ data/processed/
 results/runs/
 results/dashboard/
 reports/generated/
+reports/phase_*/
+docs/phase_*_plan.md
+docs/phase_reviews/
+docs/product_plan*.md
+docs/quality_gates.md
+docs/release_checklist.md
+docs/source_research_notes.md
+docs/strategic_positioning.md
+docs/validation_memo.md
 *.parquet
 *.log

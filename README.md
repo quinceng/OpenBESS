@@ -156,8 +156,7 @@ Read `docs/source_registry.yaml` for source status and caveats.
 Read `docs/model_boundaries.md` and `docs/known_limitations.md` for what the
 model deliberately does not claim.
 
-Read `docs/reproducibility.md` and `docs/quality_gates.md` for the verification
-workflow.
+Read `docs/reproducibility.md` for the verification workflow.
 
 ## Licence
 
