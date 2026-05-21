@@ -10,8 +10,10 @@ import pandas as pd
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from gb_bess_revenue_stack.config.reference_assets import OPENBESS_CANONICAL_ASSET_ID
 from gb_bess_revenue_stack.phase4.scenarios import (
     Phase4ForecastErrorSweepResult,
+    Phase4ForecastModelComparisonResult,
     Phase4MarketStackCaptureResult,
     Phase4SmokeWindowComparison,
 )
@@ -212,6 +214,10 @@ class Phase4DashboardCacheInput(BaseModel):
     cm_scenario_notes: str | None = None
     finance_assumptions: Phase4FinanceAssumptions = Field(default_factory=Phase4FinanceAssumptions)
     forecast_error_results: list[Phase4ForecastErrorSweepResult] = Field(default_factory=list)
+    forecast_model_comparison_results: list[Phase4ForecastModelComparisonResult] = Field(
+        default_factory=list
+    )
+    target_stack_window_label: StackSeriesWindowLabel = "trailing_12m"
     source_snapshot: dict[str, Any] | None = None
 
     @field_validator("created_at_utc")
@@ -250,6 +256,8 @@ def write_phase4_dashboard_cache(
         "stack_series_windows_csv": cache_dir / "stack_series_windows.csv",
         "forecast_error_sweeps": cache_dir / "forecast_error_sweeps.parquet",
         "forecast_error_sweeps_csv": cache_dir / "forecast_error_sweeps.csv",
+        "forecast_model_comparison": cache_dir / "forecast_model_comparison.parquet",
+        "forecast_model_comparison_csv": cache_dir / "forecast_model_comparison.csv",
         "assumptions_ledger": cache_dir / "assumptions_ledger.json",
         "source_snapshot": cache_dir / "source_snapshot.json",
     }
@@ -311,6 +319,11 @@ def write_phase4_dashboard_cache(
         parquet_path=paths["forecast_error_sweeps"],
         csv_path=paths["forecast_error_sweeps_csv"],
     )
+    _write_frame_pair(
+        pd.DataFrame(_forecast_model_comparison_rows(payload.forecast_model_comparison_results)),
+        parquet_path=paths["forecast_model_comparison"],
+        csv_path=paths["forecast_model_comparison_csv"],
+    )
     _write_json(paths["assumptions_ledger"], _assumptions_ledger(payload))
     _write_json(paths["source_snapshot"], payload.source_snapshot or _source_snapshot(payload))
     _write_json(paths["manifest"], _manifest(payload, paths))
@@ -319,6 +332,7 @@ def write_phase4_dashboard_cache(
 
 def _manifest(payload: Phase4DashboardCacheInput, paths: dict[str, Path]) -> dict[str, Any]:
     stack_window = _primary_stack_series_window(payload)
+    target_window = _target_stack_series_window(payload)
     return {
         "run_id": payload.run_id,
         "created_at_utc": payload.created_at_utc.isoformat(),
@@ -340,7 +354,10 @@ def _manifest(payload: Phase4DashboardCacheInput, paths: dict[str, Path]) -> dic
             "primary_window_label": stack_window["window_label"],
             "eligible_for_public_index": stack_window["eligible_for_public_index"],
             "eligible_for_annualisation": stack_window["eligible_for_annualisation"],
-            "caveat_flags": stack_window["caveat_flags"],
+            "target_window_label": payload.target_stack_window_label,
+            "target_window_coverage_pct": target_window["coverage_pct"],
+            "target_window_eligible": target_window["eligible_for_public_index"],
+            "caveat_flags": _stack_series_manifest_caveat_flags(payload),
         },
         "files": {key: path.name for key, path in paths.items() if key != "manifest"},
     }
@@ -377,6 +394,8 @@ def _executive_summary(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
             "stack_series_csv": "stack_series.csv",
             "forecast_error_sweeps": "forecast_error_sweeps.parquet",
             "forecast_error_sweeps_csv": "forecast_error_sweeps.csv",
+            "forecast_model_comparison": "forecast_model_comparison.parquet",
+            "forecast_model_comparison_csv": "forecast_model_comparison.csv",
             "finance_sensitivities": "finance_sensitivities.parquet",
             "finance_sensitivities_csv": "finance_sensitivities.csv",
             "data_quality": "data_quality.json",
@@ -1052,14 +1071,35 @@ def _stack_series_window_eligibility(payload: Phase4DashboardCacheInput) -> list
     return rows
 
 
-def _stack_series_caveat_flags(payload: Phase4DashboardCacheInput) -> list[str]:
+def _stack_series_caveat_flags(
+    payload: Phase4DashboardCacheInput,
+    *,
+    include_licence_flags: bool = True,
+) -> list[str]:
     primary_window = _primary_stack_series_window(payload)
+    licence_flags = payload.licence_caveat_flags if include_licence_flags else []
     return sorted(
         {
-            *payload.licence_caveat_flags,
+            *licence_flags,
             *[str(flag) for flag in primary_window["caveat_flags"]],
+            *_target_window_caveat_flags(payload),
         }
     )
+
+
+def _stack_series_manifest_caveat_flags(payload: Phase4DashboardCacheInput) -> list[str]:
+    return _stack_series_caveat_flags(payload, include_licence_flags=False)
+
+
+def _target_window_caveat_flags(payload: Phase4DashboardCacheInput) -> list[str]:
+    target_window = _target_stack_series_window(payload)
+    if (
+        payload.stack_series_asset_id == OPENBESS_CANONICAL_ASSET_ID
+        and payload.target_stack_window_label == "trailing_12m"
+        and float(target_window["coverage_pct"]) < 1.0
+    ):
+        return ["below_trailing_12m_coverage"]
+    return []
 
 
 def _expected_period_count_for_window(
@@ -1099,6 +1139,22 @@ def _primary_stack_series_window(payload: Phase4DashboardCacheInput) -> dict[str
     return windows[0]
 
 
+def _target_stack_series_window(payload: Phase4DashboardCacheInput) -> dict[str, Any]:
+    windows = _stack_series_window_eligibility(payload)
+    target = next(
+        (
+            window
+            for window in windows
+            if window["window_label"] == payload.target_stack_window_label
+        ),
+        None,
+    )
+    if target is None:
+        msg = f"Unknown target stack-series window: {payload.target_stack_window_label}"
+        raise ValueError(msg)
+    return target
+
+
 def _preferred_stack_series_window(
     windows: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -1127,6 +1183,12 @@ def _annualisation_eligible(payload: Phase4DashboardCacheInput) -> bool:
 
 def _forecast_error_rows(
     results: list[Phase4ForecastErrorSweepResult],
+) -> list[dict[str, Any]]:
+    return [result.model_dump(mode="json") for result in results]
+
+
+def _forecast_model_comparison_rows(
+    results: list[Phase4ForecastModelComparisonResult],
 ) -> list[dict[str, Any]]:
     return [result.model_dump(mode="json") for result in results]
 

@@ -14,7 +14,9 @@ results/dashboard/
 reports/generated/
 reports/phase_*/
 docs/phase_*_plan.md
-docs/phase_reviews/
+docs/phase_reviews/*
+!docs/phase_reviews/
+!docs/phase_reviews/phase_6_review.md
 docs/product_plan*.md
 docs/quality_gates.md
 docs/release_checklist.md

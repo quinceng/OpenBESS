@@ -9,6 +9,7 @@ import pytest
 
 from gb_bess_revenue_stack.phase4.scenarios import (
     Phase4ForecastErrorSweepResult,
+    Phase4ForecastModelComparisonResult,
     Phase4MarketStackCaptureResult,
 )
 from gb_bess_revenue_stack.policies.rolling_market_stack import (
@@ -44,6 +45,8 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert (tmp_path / "stack_series_windows.csv").exists()
     assert (tmp_path / "forecast_error_sweeps.parquet").exists()
     assert (tmp_path / "forecast_error_sweeps.csv").exists()
+    assert (tmp_path / "forecast_model_comparison.parquet").exists()
+    assert (tmp_path / "forecast_model_comparison.csv").exists()
     assert (tmp_path / "finance_sensitivities.parquet").exists()
     assert (tmp_path / "finance_sensitivities.csv").exists()
     assert (tmp_path / "assumptions_ledger.json").exists()
@@ -66,14 +69,23 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert manifest["files"]["stack_series_windows_csv"] == "stack_series_windows.csv"
     assert manifest["files"]["forecast_error_sweeps"] == "forecast_error_sweeps.parquet"
     assert manifest["files"]["forecast_error_sweeps_csv"] == "forecast_error_sweeps.csv"
+    assert manifest["files"]["forecast_model_comparison"] == "forecast_model_comparison.parquet"
+    assert manifest["files"]["forecast_model_comparison_csv"] == "forecast_model_comparison.csv"
     assert manifest["files"]["finance_sensitivities"] == "finance_sensitivities.parquet"
     assert manifest["files"]["finance_sensitivities_csv"] == "finance_sensitivities.csv"
     assert manifest["files"]["assumptions_ledger"] == "assumptions_ledger.json"
     assert manifest["files"]["source_snapshot"] == "source_snapshot.json"
     assert manifest["files"]["stack_series_parquet"] == "stack_series.parquet"
     assert manifest["files"]["stack_series_csv"] == "stack_series.csv"
+    assert manifest["schema_version"] == "0.1.0"
+    assert manifest["stack_series"]["schema_version"] == "0.1.0"
     assert manifest["stack_series"]["row_count"] == 2
+    assert manifest["stack_series"]["target_window_label"] == "trailing_12m"
+    assert manifest["stack_series"]["target_window_eligible"] is False
     assert executive_summary["links"]["forecast_error_sweeps"] == ("forecast_error_sweeps.parquet")
+    assert executive_summary["links"]["forecast_model_comparison"] == (
+        "forecast_model_comparison.parquet"
+    )
     assert executive_summary["links"]["finance_sensitivities"] == "finance_sensitivities.parquet"
     assert executive_summary["links"]["data_quality_summary_csv"] == "data_quality_summary.csv"
     assert "not_a_market_index" in manifest["licence_caveat_flags"]
@@ -466,6 +478,63 @@ def test_phase5_cache_writes_forecast_error_sweeps(tmp_path: Path) -> None:
     assert forecast_error_csv["price_scalar"].iloc[0] == pytest.approx(0.9)
 
 
+def test_phase6_cache_writes_forecast_model_comparison_rows(tmp_path: Path) -> None:
+    write_phase4_dashboard_cache(_phase5_payload(), tmp_path)
+
+    comparison = pd.read_parquet(tmp_path / "forecast_model_comparison.parquet")
+    comparison_csv = pd.read_csv(tmp_path / "forecast_model_comparison.csv")
+
+    assert comparison["forecast_model"].tolist() == [
+        "previous_day_same_period",
+        "trailing_7_day_mean_by_settlement_period",
+    ]
+    assert comparison["forecast_mae_gbp_per_mwh"].tolist() == [12.0, 10.0]
+    assert comparison["capture_ratio"].tolist() == [pytest.approx(0.8), pytest.approx(0.75)]
+    assert comparison["oracle_step_count"].tolist() == [0, 0]
+    assert comparison["forecast_is_oracle"].tolist() == [False, False]
+    assert comparison_csv["excluded_future_row_count"].tolist() == [4, 4]
+
+
+def test_phase6_cache_marks_canonical_runs_below_trailing_12m_coverage(tmp_path: Path) -> None:
+    payload = _phase5_payload().model_copy(
+        update={
+            "stack_series_asset_id": "openbess_canonical_1mw_2mwh",
+        }
+    )
+    payload.central_capture.price_period_count = 90 * 48
+    payload.central_capture.sample_hours = 90 * 24
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    stack_series = pd.read_parquet(tmp_path / "stack_series.parquet")
+
+    assert manifest["stack_series"]["primary_window_label"] == "90d"
+    assert manifest["stack_series"]["target_window_label"] == "trailing_12m"
+    assert manifest["stack_series"]["target_window_eligible"] is False
+    assert "below_trailing_12m_coverage" in manifest["stack_series"]["caveat_flags"]
+    assert "below_trailing_12m_coverage" in stack_series["caveat_flags"].iloc[0]
+
+
+def test_phase6_cache_prefers_eligible_trailing_12m_target_window(tmp_path: Path) -> None:
+    payload = _phase5_payload().model_copy(
+        update={
+            "stack_series_asset_id": "openbess_canonical_1mw_2mwh",
+        }
+    )
+    payload.central_capture.price_period_count = 365 * 48
+    payload.central_capture.sample_hours = 365 * 24
+
+    write_phase4_dashboard_cache(payload, tmp_path)
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+
+    assert manifest["stack_series"]["primary_window_label"] == "trailing_12m"
+    assert manifest["stack_series"]["target_window_label"] == "trailing_12m"
+    assert manifest["stack_series"]["target_window_eligible"] is True
+    assert "below_trailing_12m_coverage" not in manifest["stack_series"]["caveat_flags"]
+
+
 def _phase5_payload() -> Phase4DashboardCacheInput:
     run = RollingMarketStackRun(
         steps=[
@@ -540,6 +609,44 @@ def _phase5_payload() -> Phase4DashboardCacheInput:
                 realised_total_revenue_gbp=250,
                 final_soc_mwh=1,
             )
+        ],
+        forecast_model_comparison_results=[
+            Phase4ForecastModelComparisonResult(
+                forecast_model="previous_day_same_period",
+                period_count=4,
+                forecast_mae_gbp_per_mwh=12,
+                forecast_rmse_gbp_per_mwh=15,
+                rolling_energy_revenue_gbp=190,
+                rolling_service_revenue_gbp=50,
+                rolling_total_revenue_gbp=240,
+                capture_ratio=0.8,
+                regret_gbp=60,
+                solver_failure_count=0,
+                final_soc_mwh=1,
+                excluded_future_row_count=4,
+                excluded_service_cell_count=0,
+                oracle_step_count=0,
+                forecast_is_oracle=False,
+                information_source_hash_count=2,
+            ),
+            Phase4ForecastModelComparisonResult(
+                forecast_model="trailing_7_day_mean_by_settlement_period",
+                period_count=4,
+                forecast_mae_gbp_per_mwh=10,
+                forecast_rmse_gbp_per_mwh=14,
+                rolling_energy_revenue_gbp=180,
+                rolling_service_revenue_gbp=45,
+                rolling_total_revenue_gbp=225,
+                capture_ratio=0.75,
+                regret_gbp=75,
+                solver_failure_count=0,
+                final_soc_mwh=1,
+                excluded_future_row_count=4,
+                excluded_service_cell_count=0,
+                oracle_step_count=0,
+                forecast_is_oracle=False,
+                information_source_hash_count=2,
+            ),
         ],
         caveats=["Synthetic stress profile; not a bankability forecast."],
         config_hash="fixture-config",

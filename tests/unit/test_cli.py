@@ -74,6 +74,7 @@ def test_cli_exposes_run_release_cache_subcommand() -> None:
     assert "--asset-id" in output
     assert "--cm-scenarios-yaml" in output
     assert "--horizon-periods" in output
+    assert "--target-window-label" in output
 
 
 def test_cm_sidecar_selects_matching_duration_t4_scenario() -> None:

@@ -102,6 +102,7 @@ The published artefacts for the dashboard and release bundle may include:
 - `revenue_stack.parquet` and `revenue_stack.csv`;
 - `policy_capture.parquet` and `policy_capture.csv`;
 - `forecast_error_sweeps.parquet` and `forecast_error_sweeps.csv`;
+- `forecast_model_comparison.parquet` and `forecast_model_comparison.csv`;
 - dashboard manifest and caveats;
 - window eligibility metadata;
 - reference-asset metadata;
@@ -118,6 +119,12 @@ period optimisation or dispatch revenue.
 Forecast error sweeps show how rolling-policy value changes when wholesale
 forecasts are biased or scaled. They are sensitivity rows and should not be
 presented as a separate market component.
+
+Forecast model comparison rows show how the rolling policy changes under simple
+auditable no-leakage wholesale forecast baselines such as previous-day same
+settlement period and trailing mean by settlement period. These rows report
+forecast MAE, forecast RMSE, rolling value and capture ratio. They do not claim
+commercial forecasting performance.
 
 ## Non-Claims
 

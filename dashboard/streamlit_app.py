@@ -49,6 +49,7 @@ def build_view_model(cache: DashboardCache) -> dict[str, Any]:
         "has_data_quality": cache.data_quality is not None,
         "has_stack_series": cache.stack_series is not None,
         "has_forecast_error_sweeps": cache.forecast_error_sweeps is not None,
+        "has_forecast_model_comparison": cache.forecast_model_comparison is not None,
         "has_finance_sensitivities": cache.finance_sensitivities is not None,
         "stack_index": _stack_index_view(cache),
         "stack_story_steps": STACK_STORY_STEPS,
@@ -77,6 +78,7 @@ def render_dashboard(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> None:
     _render_scenarios(st, cache)
     _render_phase5(st, cache)
     _render_stack_index_preview(st, cache, model)
+    _render_forecast_model_comparison(st, cache)
     _render_forecast_error_sweeps(st, cache)
     _render_data_quality(st, cache)
     _render_sources_and_caveats(st, model)
@@ -211,6 +213,13 @@ def _render_forecast_error_sweeps(st: Any, cache: DashboardCache) -> None:
         return
     st.subheader("Forecast Error Sensitivities")
     st.dataframe(cache.forecast_error_sweeps, hide_index=True, use_container_width=True)
+
+
+def _render_forecast_model_comparison(st: Any, cache: DashboardCache) -> None:
+    if cache.forecast_model_comparison is None or cache.forecast_model_comparison.empty:
+        return
+    st.subheader("Forecast Model Comparison")
+    st.dataframe(cache.forecast_model_comparison, hide_index=True, use_container_width=True)
 
 
 def _render_data_quality(st: Any, cache: DashboardCache) -> None:

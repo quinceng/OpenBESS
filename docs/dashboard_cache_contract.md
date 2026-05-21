@@ -34,6 +34,11 @@ Every dashboard artefact must include or reference metadata with:
 - `central_or_sensitivity`;
 - `refresh_cadence`.
 
+The dashboard cache `schema_version` remains `0.1.0` for Release 1 patch
+updates that only add optional files, optional manifest keys or new caveat
+flags. A schema-version bump is reserved for removed fields, renamed fields or
+changed meanings of existing fields.
+
 ## 3. Suggested Files
 
 Suggested cache files:
@@ -55,6 +60,8 @@ results/dashboard/stack_series.parquet
 results/dashboard/stack_series.csv
 results/dashboard/forecast_error_sweeps.parquet
 results/dashboard/forecast_error_sweeps.csv
+results/dashboard/forecast_model_comparison.parquet
+results/dashboard/forecast_model_comparison.csv
 results/dashboard/benchmark_reconciliation.json
 results/dashboard/data_quality.json
 results/dashboard/data_quality_summary.csv
@@ -85,6 +92,8 @@ results/dashboard/stack_series.parquet
 results/dashboard/stack_series.csv
 results/dashboard/forecast_error_sweeps.parquet
 results/dashboard/forecast_error_sweeps.csv
+results/dashboard/forecast_model_comparison.parquet
+results/dashboard/forecast_model_comparison.csv
 results/dashboard/benchmark_reconciliation.json
 results/dashboard/eac_commitments.parquet
 results/dashboard/data_quality.json
@@ -110,6 +119,12 @@ deterministic rolling-policy sensitivities for biased or scaled wholesale
 forecasts. These rows are diagnostics for forecast imperfection and are not
 headline market values.
 
+`forecast_model_comparison.parquet` and `forecast_model_comparison.csv` record
+the simple no-leakage forecast baseline comparison used in Phase 6. The rows
+compare `PreviousDaySamePeriodForecast` against the trailing settlement-period
+mean using MAE, RMSE, rolling revenue and capture ratio. They are forecast-policy
+diagnostics, not commercial forecast calibration or bankability evidence.
+
 `finance_sensitivities.parquet` and `finance_sensitivities.csv` record
 dashboard-visible low/central/high finance scenario rows. They compare fixed
 O&M, augmentation timing/cost, discount-rate, degradation-cost and Capacity
@@ -130,6 +145,12 @@ eligibility, public-index eligibility and `expected_period_basis` for each
 tracked window. The `ytd` window uses calendar year-to-date from
 `created_at_utc` with a 90-day minimum floor, not a duplicate fixed 90-day
 window.
+
+The manifest also records `target_window_label`, `target_window_coverage_pct`
+and `target_window_eligible` under `stack_series`. Release 1 uses `trailing_12m`
+as the preferred target window while still allowing a canonical 90-day run to
+serve as the minimum public annualisation gate. Canonical runs below full
+trailing-12-month coverage carry `below_trailing_12m_coverage`.
 
 ## 4. Executive Summary Schema
 

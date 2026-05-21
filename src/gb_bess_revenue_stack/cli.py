@@ -13,7 +13,10 @@ from pydantic import ValidationError
 
 from gb_bess_revenue_stack.commercial import CommercialBessSystem
 from gb_bess_revenue_stack.config.models import AssetConfig
-from gb_bess_revenue_stack.config.reference_assets import load_reference_assets
+from gb_bess_revenue_stack.config.reference_assets import (
+    OPENBESS_CANONICAL_ASSET_ID,
+    load_reference_assets,
+)
 from gb_bess_revenue_stack.data.cache import RawCache
 from gb_bess_revenue_stack.data.elexon import ELEXON_BASE_URL, MARKET_INDEX_PATH, ElexonMIDClient
 from gb_bess_revenue_stack.data.manifest import DatasetManifest, ProcessedDatasetWriter
@@ -50,6 +53,7 @@ from gb_bess_revenue_stack.phase4.scenarios import (
     default_phase4_market_stack_scenarios,
     load_phase4_historical_sample,
     run_phase4_forecast_error_sweep,
+    run_phase4_forecast_model_comparison,
     run_phase4_market_stack_capture_comparison,
     run_phase4_market_stack_sweep,
     run_phase4_smoke_window_comparisons,
@@ -71,7 +75,11 @@ from gb_bess_revenue_stack.reporting.investor_workbook import (
     InvestorWorkbookInput,
     write_investor_workbook,
 )
-from gb_bess_revenue_stack.reporting.stack_series import StackSeriesRow, write_stack_series
+from gb_bess_revenue_stack.reporting.stack_series import (
+    StackSeriesRow,
+    StackSeriesWindowLabel,
+    write_stack_series,
+)
 from gb_bess_revenue_stack.residential import (
     ResidentialHouseholdDispatchInput,
     ResidentialHouseholdDispatchResult,
@@ -411,7 +419,7 @@ def run_release_cache(
     asset_id: Annotated[
         str,
         typer.Option(help="Reference asset id for the OpenBESS Stack Index run."),
-    ] = "openbess_canonical_1mw_2mwh",
+    ] = OPENBESS_CANONICAL_ASSET_ID,
     finance_assumptions_yaml: Annotated[
         Path | None,
         typer.Option(help="Optional YAML file overriding finance assumptions."),
@@ -428,6 +436,10 @@ def run_release_cache(
         int,
         typer.Option(help="Executed periods per rolling solve."),
     ] = 48,
+    target_window_label: Annotated[
+        StackSeriesWindowLabel,
+        typer.Option(help="Preferred coverage window for public release metadata."),
+    ] = "trailing_12m",
 ) -> None:
     """Run a longer cached OpenBESS Stack Index release preview."""
 
@@ -508,6 +520,13 @@ def run_release_cache(
         config=rolling_config,
         scenarios=default_phase4_forecast_error_scenarios(),
     )
+    forecast_model_comparison_results = run_phase4_forecast_model_comparison(
+        prices=sample.prices,
+        eac_price_matrix=sample.eac_price_matrix,
+        asset=asset,
+        initial_soc_mwh=initial_soc_mwh,
+        config=rolling_config,
+    )
     cm_label, cm_value, cm_source_id, cm_source_url, cm_notes = _cm_sidecar_for_asset(
         cm_scenarios_yaml=cm_scenarios_yaml,
         asset_duration_hours=reference.cm_duration_hours,
@@ -542,6 +561,8 @@ def run_release_cache(
             cm_scenario_source_url=cm_source_url,
             cm_scenario_notes=cm_notes,
             forecast_error_results=forecast_error_results,
+            forecast_model_comparison_results=forecast_model_comparison_results,
+            target_stack_window_label=target_window_label,
             source_snapshot=aligned.manifest,
         ),
         dashboard_dir,
@@ -563,6 +584,10 @@ def run_release_cache(
                 "cm_scenario_source_id": cm_source_id,
                 "cm_scenario_source_url": cm_source_url,
                 "cm_scenario_notes": cm_notes,
+                "target_window_label": target_window_label,
+                "forecast_model_comparison": [
+                    result.model_dump(mode="json") for result in forecast_model_comparison_results
+                ],
             },
             indent=2,
         ),

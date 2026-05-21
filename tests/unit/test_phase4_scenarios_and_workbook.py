@@ -28,12 +28,17 @@ from gb_bess_revenue_stack.phase4.scenarios import (
     default_phase4_market_stack_scenarios,
     load_phase4_historical_sample,
     run_phase4_forecast_error_sweep,
+    run_phase4_forecast_model_comparison,
     run_phase4_market_stack_capture_comparison,
     run_phase4_market_stack_sweep,
     run_phase4_smoke_window_comparisons,
     skipped_phase4_smoke_windows,
 )
-from gb_bess_revenue_stack.policies.forecasts import OracleForecast
+from gb_bess_revenue_stack.policies.forecasts import (
+    OracleForecast,
+    PreviousDaySamePeriodForecast,
+    TrailingMeanBySettlementPeriodForecast,
+)
 from gb_bess_revenue_stack.policies.rolling import RollingConfig
 from gb_bess_revenue_stack.policies.rolling_market_stack import (
     RollingMarketStackRun,
@@ -319,6 +324,90 @@ def test_forecast_error_sweep_reports_forecast_error_metrics() -> None:
     assert results[0].forecast_mae_gbp_per_mwh == pytest.approx(0)
     assert results[1].forecast_mae_gbp_per_mwh == pytest.approx(10)
     assert results[1].forecast_model.startswith("oracle_diagnostic:positive_bias")
+
+
+def test_forecast_model_comparison_reports_simple_no_leakage_baselines() -> None:
+    prices = build_realistic_stress_price_profile(
+        start_utc=datetime(2024, 1, 1, tzinfo=UTC),
+        day_count=10,
+    )
+    matrix = synthetic_service_matrix(
+        product_model_label="dynamic_containment_low",
+        direction_model_label="upward",
+        prices_gbp_per_mw_h=[8] * len(prices),
+        duration_h=0.5,
+    )
+    config = RollingConfig(
+        horizon_periods=48,
+        step_periods=48,
+        terminal_soc_policy="target",
+        terminal_soc_target_mwh=1,
+        evaluation_start_utc=prices[48].delivery_start_utc,
+    )
+
+    results = run_phase4_forecast_model_comparison(
+        prices=prices,
+        eac_price_matrix=matrix,
+        asset=_phase4_test_asset(),
+        initial_soc_mwh=1,
+        config=config,
+        forecast_models=[
+            PreviousDaySamePeriodForecast(),
+            TrailingMeanBySettlementPeriodForecast(lookback_days=7),
+        ],
+    )
+
+    by_model = {result.forecast_model: result for result in results}
+
+    assert set(by_model) == {
+        "previous_day_same_period",
+        "trailing_7_day_mean_by_settlement_period",
+    }
+    assert all(result.period_count == len(prices) for result in results)
+    assert all(result.forecast_is_oracle is False for result in results)
+    assert all(result.oracle_step_count == 0 for result in results)
+    assert all(result.excluded_future_row_count > 0 for result in results)
+    assert all(result.information_source_hash_count > 0 for result in results)
+    assert all(result.capture_ratio is not None for result in results)
+    assert (
+        by_model["previous_day_same_period"].forecast_mae_gbp_per_mwh
+        != by_model["trailing_7_day_mean_by_settlement_period"].forecast_mae_gbp_per_mwh
+    )
+
+
+def test_forecast_model_comparison_flags_oracle_diagnostic_models() -> None:
+    prices = build_realistic_stress_price_profile(
+        start_utc=datetime(2024, 1, 1, tzinfo=UTC),
+        day_count=2,
+    )
+    matrix = synthetic_service_matrix(
+        product_model_label="dynamic_containment_low",
+        direction_model_label="upward",
+        prices_gbp_per_mw_h=[8] * len(prices),
+        duration_h=0.5,
+    )
+    config = RollingConfig(
+        horizon_periods=48,
+        step_periods=48,
+        terminal_soc_policy="target",
+        terminal_soc_target_mwh=1,
+        evaluation_start_utc=prices[48].delivery_start_utc,
+    )
+
+    [result] = run_phase4_forecast_model_comparison(
+        prices=prices,
+        eac_price_matrix=matrix,
+        asset=_phase4_test_asset(),
+        initial_soc_mwh=1,
+        config=config,
+        forecast_models=[OracleForecast()],
+    )
+
+    assert result.forecast_model == "oracle_diagnostic"
+    assert result.forecast_is_oracle is True
+    assert result.oracle_step_count == 1
+    assert result.forecast_mae_gbp_per_mwh == pytest.approx(0)
+    assert result.forecast_rmse_gbp_per_mwh == pytest.approx(0)
 
 
 def test_phase4_smoke_window_comparisons_include_24h_and_48h_windows() -> None:

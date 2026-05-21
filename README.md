@@ -148,6 +148,7 @@ uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 ## Where To Read Next
 
 Start with `docs/openbess_stack_index.md` for the public index methodology.
+The latest release note is `docs/release_notes_v0.1.1.md`.
 
 Read `docs/methodology.md` for the model equations and known time policy.
 

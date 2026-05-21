@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from gb_bess_revenue_stack.config.models import AssetConfig
 
+OPENBESS_CANONICAL_ASSET_ID = "openbess_canonical_1mw_2mwh"
+
 
 class ReferenceAsset(BaseModel):
     """Public reference asset preset and market-scope metadata."""

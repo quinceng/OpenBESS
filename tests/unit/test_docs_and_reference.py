@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import csv
+import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
 
+from gb_bess_revenue_stack import __version__
 from gb_bess_revenue_stack.schemas.market import CapacityMarketScenario
 
 pytestmark = pytest.mark.unit
@@ -85,6 +87,20 @@ def test_capacity_market_caveat_is_closed_as_reference_sidecar() -> None:
 def test_release_hardening_files_exist() -> None:
     assert (ROOT / "LICENSE").is_file()
     assert (ROOT / "CHANGELOG.md").is_file()
+    assert (ROOT / "docs/release_notes_v0.1.1.md").is_file()
+    assert (ROOT / "docs/phase_reviews/phase_6_review.md").is_file()
+
+
+def test_release_version_docs_match_package_version() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = pyproject["project"]["version"]
+    release_note = ROOT / f"docs/release_notes_v{version}.md"
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert __version__ == version
+    assert release_note.is_file()
+    assert f"OpenBESS v{version} Release Note" in release_note.read_text(encoding="utf-8")
+    assert f"## {version} -" in changelog
 
 
 def test_openbess_stack_index_public_doc_records_required_boundary_language() -> None:

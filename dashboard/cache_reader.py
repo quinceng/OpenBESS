@@ -30,6 +30,7 @@ OPTIONAL_FILES = {
     "stack_series_csv": "stack_series.csv",
     "stack_series_windows": "stack_series_windows.csv",
     "forecast_error_sweeps": "forecast_error_sweeps.parquet",
+    "forecast_model_comparison": "forecast_model_comparison.parquet",
     "data_quality_summary": "data_quality_summary.csv",
     "assumptions_ledger": "assumptions_ledger.json",
     "source_snapshot": "source_snapshot.json",
@@ -75,6 +76,7 @@ class DashboardCache:
     stack_series: pd.DataFrame | None = None
     stack_series_windows: pd.DataFrame | None = None
     forecast_error_sweeps: pd.DataFrame | None = None
+    forecast_model_comparison: pd.DataFrame | None = None
     data_quality_summary: pd.DataFrame | None = None
     assumptions_ledger: dict[str, Any] | None = None
     source_snapshot: dict[str, Any] | None = None
@@ -121,6 +123,9 @@ def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> Dashboard
             stack_series_windows=_read_optional_csv(root / OPTIONAL_FILES["stack_series_windows"]),
             forecast_error_sweeps=_read_optional_parquet(
                 root / OPTIONAL_FILES["forecast_error_sweeps"]
+            ),
+            forecast_model_comparison=_read_optional_parquet(
+                root / OPTIONAL_FILES["forecast_model_comparison"]
             ),
             data_quality_summary=_read_optional_csv(root / OPTIONAL_FILES["data_quality_summary"]),
             assumptions_ledger=_read_optional_json(root / OPTIONAL_FILES["assumptions_ledger"]),

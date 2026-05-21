@@ -17,6 +17,7 @@ notes can exist in the same working tree, but are ignored from the public repo.
 
 ## Release docs
 
+- `release_notes_v0.1.1.md`: latest Release 1 patch note covering Phase 6 hardening.
 - `finance_boundaries.md`: finance scenario inclusions, exclusions and required caveat wording.
 - `known_limitations.md`: durable limitations that must stay visible in methodology, dashboard and README.
 - `reproducibility.md`: intended reproducibility workflow for a clean clone.

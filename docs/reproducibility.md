@@ -110,6 +110,23 @@ Dashboard cache is built by the network-free Phase 4 smoke command:
 uv run gb-bess run-phase4-smoke
 ```
 
+Longer release caches use the aligned public-source cache and release runner:
+
+```bash
+uv run gb-bess build-phase4-aligned-cache --start 2026-02-01T00:00:00Z --days 90 --output-dir results/runs/release_cache_90d_historical/aligned_sources
+uv run gb-bess run-release-cache --aligned-cache-dir results/runs/release_cache_90d_historical/aligned_sources --output-dir results/runs/release_cache_90d_historical --dashboard-dir results/dashboard/release_90d_historical --target-window-label trailing_12m
+```
+
+For Release 1, `results/dashboard/release_90d_historical` is the canonical
+OpenBESS reference cache because it uses `openbess_canonical_1mw_2mwh` and meets
+the 90-day public annualisation gate. `trailing_12m` remains the preferred target
+window in metadata; when that target is not fully covered, canonical outputs
+carry `below_trailing_12m_coverage`.
+
+The existing `results/dashboard/commercial_trailing_12m` artefact is a generated
+commercial branch artefact using `commercial_phase4_3mw_10mwh`. It demonstrates
+longer coverage, but it is not the canonical OpenBESS reference asset cache.
+
 The dashboard should then run from cached files without solver, raw data or live
 API calls:
 

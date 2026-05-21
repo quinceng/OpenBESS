@@ -23,7 +23,13 @@ from gb_bess_revenue_stack.data.neso import (
 from gb_bess_revenue_stack.markets.eac_prices import EACPriceMatrix, build_eac_price_matrix
 from gb_bess_revenue_stack.optimisation.inputs import TerminalSocPolicy
 from gb_bess_revenue_stack.optimisation.market_stack_model import solve_market_stack
-from gb_bess_revenue_stack.policies.forecasts import ForecastModel, ForecastPoint, ForecastResult
+from gb_bess_revenue_stack.policies.forecasts import (
+    ForecastModel,
+    ForecastPoint,
+    ForecastResult,
+    PreviousDaySamePeriodForecast,
+    TrailingMeanBySettlementPeriodForecast,
+)
 from gb_bess_revenue_stack.policies.rolling import RollingConfig
 from gb_bess_revenue_stack.policies.rolling_market_stack import (
     RollingMarketStackRun,
@@ -134,6 +140,29 @@ class Phase4ForecastErrorSweepResult(BaseModel):
     rolling_total_revenue_gbp: float
     capture_ratio: float | None
     final_soc_mwh: float
+
+
+class Phase4ForecastModelComparisonResult(BaseModel):
+    """Side-by-side result for simple no-leakage rolling forecast baselines."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    forecast_model: str
+    period_count: int = Field(ge=0)
+    forecast_mae_gbp_per_mwh: float
+    forecast_rmse_gbp_per_mwh: float
+    rolling_energy_revenue_gbp: float
+    rolling_service_revenue_gbp: float
+    rolling_total_revenue_gbp: float
+    capture_ratio: float | None
+    regret_gbp: float
+    solver_failure_count: int = Field(ge=0)
+    final_soc_mwh: float
+    excluded_future_row_count: int = Field(ge=0)
+    excluded_service_cell_count: int = Field(ge=0)
+    oracle_step_count: int = Field(ge=0)
+    forecast_is_oracle: bool
+    information_source_hash_count: int = Field(ge=0)
 
 
 class Phase4HistoricalSample(BaseModel):
@@ -488,6 +517,71 @@ def run_phase4_forecast_error_sweep(
                 rolling_total_revenue_gbp=rolling.realised_total_revenue_gbp,
                 capture_ratio=capture.capture_ratio,
                 final_soc_mwh=rolling.final_soc_mwh,
+            )
+        )
+    return results
+
+
+def run_phase4_forecast_model_comparison(
+    *,
+    prices: list[WholesalePricePoint],
+    eac_price_matrix: EACPriceMatrix,
+    asset: AssetConfig,
+    initial_soc_mwh: float,
+    config: RollingConfig,
+    forecast_models: list[ForecastModel] | None = None,
+) -> list[Phase4ForecastModelComparisonResult]:
+    """Compare simple rolling forecast baselines under the same information-set rules."""
+
+    selected = forecast_models or [
+        PreviousDaySamePeriodForecast(),
+        TrailingMeanBySettlementPeriodForecast(lookback_days=7),
+    ]
+    results: list[Phase4ForecastModelComparisonResult] = []
+    for forecast_model in selected:
+        rolling = run_rolling_market_stack_policy(
+            prices=prices,
+            eac_price_matrix=eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            forecast_model=forecast_model,
+            config=config,
+        )
+        capture = run_phase4_market_stack_capture_comparison(
+            prices=prices,
+            eac_price_matrix=eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            rolling_run=rolling,
+            terminal_soc_policy=config.terminal_soc_policy,  # type: ignore[arg-type]
+            terminal_soc_target_mwh=config.terminal_soc_target_mwh,
+            solver_config=config.solver,
+        )
+        oracle_step_count = sum(1 for step in rolling.steps if step.forecast_is_oracle)
+        results.append(
+            Phase4ForecastModelComparisonResult(
+                forecast_model=rolling.forecast_model,
+                period_count=len(prices),
+                forecast_mae_gbp_per_mwh=capture.forecast_mae_gbp_per_mwh,
+                forecast_rmse_gbp_per_mwh=capture.forecast_rmse_gbp_per_mwh,
+                rolling_energy_revenue_gbp=rolling.realised_energy_revenue_gbp,
+                rolling_service_revenue_gbp=rolling.realised_service_revenue_gbp,
+                rolling_total_revenue_gbp=rolling.realised_total_revenue_gbp,
+                capture_ratio=capture.capture_ratio,
+                regret_gbp=capture.regret_gbp,
+                solver_failure_count=rolling.solver_failure_count,
+                final_soc_mwh=rolling.final_soc_mwh,
+                excluded_future_row_count=sum(
+                    step.excluded_future_row_count for step in rolling.steps
+                ),
+                excluded_service_cell_count=sum(
+                    step.excluded_service_cell_count for step in rolling.steps
+                ),
+                oracle_step_count=oracle_step_count,
+                forecast_is_oracle=oracle_step_count > 0,
+                information_source_hash_count=len(
+                    {step.information_source_hash for step in rolling.steps}
+                ),
             )
         )
     return results
