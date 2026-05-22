@@ -8,7 +8,6 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dashboard.cache_reader import (
-    DEFAULT_CACHE_DIR,
     DashboardCache,
     DashboardCacheError,
     load_dashboard_cache,
@@ -56,7 +55,7 @@ def build_view_model(cache: DashboardCache) -> dict[str, Any]:
     }
 
 
-def render_dashboard(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> None:
+def render_dashboard(cache_dir: str | Path | None = None) -> None:
     """Render the cached dashboard in Streamlit."""
 
     import streamlit as st
@@ -186,8 +185,8 @@ def _render_stack_index_preview(
     st.caption(" | ".join(model["stack_story_steps"]))
     columns = st.columns(4)
     columns[0].metric("Primary Window", stack_index["primary_window_label"])
-    columns[1].metric("Coverage", _format_ratio(stack_index["primary_coverage_pct"]))
-    columns[2].metric("Public Eligibility", "yes" if stack_index["public_eligible"] else "no")
+    columns[1].metric("Target Window", stack_index["target_window_label"])
+    columns[2].metric("Coverage", _format_ratio(stack_index["primary_coverage_pct"]))
     columns[3].metric("Annualisation", "yes" if stack_index["annualisation_eligible"] else "no")
     columns = [
         "window_label",
@@ -209,17 +208,56 @@ def _render_stack_index_preview(
 
 
 def _render_forecast_error_sweeps(st: Any, cache: DashboardCache) -> None:
-    if cache.forecast_error_sweeps is None or cache.forecast_error_sweeps.empty:
+    if cache.forecast_error_sweeps is None:
         return
     st.subheader("Forecast Error Sensitivities")
+    if cache.forecast_error_sweeps.empty:
+        st.info(
+            _empty_optional_diagnostic_note(
+                cache,
+                manifest_key="forecast_error_sweeps",
+                label="Forecast error sensitivity",
+            )
+        )
+        return
     st.dataframe(cache.forecast_error_sweeps, hide_index=True, use_container_width=True)
 
 
 def _render_forecast_model_comparison(st: Any, cache: DashboardCache) -> None:
-    if cache.forecast_model_comparison is None or cache.forecast_model_comparison.empty:
+    if cache.forecast_model_comparison is None:
         return
     st.subheader("Forecast Model Comparison")
+    if cache.forecast_model_comparison.empty:
+        st.info(
+            _empty_optional_diagnostic_note(
+                cache,
+                manifest_key="forecast_model_comparison",
+                label="Forecast model comparison",
+            )
+        )
+        return
     st.dataframe(cache.forecast_model_comparison, hide_index=True, use_container_width=True)
+
+
+def _empty_optional_diagnostic_note(
+    cache: DashboardCache,
+    *,
+    manifest_key: str,
+    label: str,
+) -> str:
+    files = cache.manifest.get("files", {})
+    advertised = isinstance(files, dict) and manifest_key in files
+    config_hash = str(cache.manifest.get("config_hash", ""))
+    if advertised and "profile=trailing12m" in config_hash:
+        return (
+            f"{label} rows are empty for this cache because the trailing12m "
+            "release profile skips supplementary diagnostics. See the historical "
+            "90-day preview cache and Phase 6 review for side-by-side diagnostic "
+            "evidence."
+        )
+    if advertised:
+        return f"{label} file is present but contains no rows."
+    return f"{label} rows are not available in this cache."
 
 
 def _render_data_quality(st: Any, cache: DashboardCache) -> None:
@@ -268,15 +306,24 @@ def _stack_index_view(cache: DashboardCache) -> dict[str, Any]:
     )
     public_eligible = bool(metadata.get("eligible_for_public_index", False))
     annualisation_eligible = bool(metadata.get("eligible_for_annualisation", False))
+    target_window_label = str(metadata.get("target_window_label", primary_window_label))
+    caveat_flags = list(metadata.get("caveat_flags", []))
+    trailing_12m_complete = (
+        primary_window_label == "trailing_12m"
+        and public_eligible
+        and "below_trailing_12m_coverage" not in caveat_flags
+        and metadata.get("target_window_eligible") is True
+    )
     return {
-        "display_label": "OpenBESS Stack Index"
-        if public_eligible
-        else "OpenBESS Stack Index Preview",
+        "display_label": "OpenBESS Stack Index Preview"
+        if not trailing_12m_complete
+        else "OpenBESS Stack Index",
         "primary_window_label": primary_window_label,
+        "target_window_label": target_window_label,
         "primary_coverage_pct": primary_window.get("coverage_pct"),
         "public_eligible": public_eligible,
         "annualisation_eligible": annualisation_eligible,
-        "caveat_flags": list(metadata.get("caveat_flags", [])),
+        "caveat_flags": caveat_flags,
     }
 
 

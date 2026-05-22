@@ -110,29 +110,81 @@ Dashboard cache is built by the network-free Phase 4 smoke command:
 uv run gb-bess run-phase4-smoke
 ```
 
-Longer release caches use the aligned public-source cache and release runner:
+Longer release caches use the aligned public-source cache and release runner.
+The expanded command path for the canonical trailing-12-month cache appears
+below.
 
-```bash
-uv run gb-bess build-phase4-aligned-cache --start 2026-02-01T00:00:00Z --days 90 --output-dir results/runs/release_cache_90d_historical/aligned_sources
-uv run gb-bess run-release-cache --aligned-cache-dir results/runs/release_cache_90d_historical/aligned_sources --output-dir results/runs/release_cache_90d_historical --dashboard-dir results/dashboard/release_90d_historical --target-window-label trailing_12m
-```
+`results/dashboard/release_trailing_12m_historical` is the canonical OpenBESS
+reference cache when its manifest primary window is `trailing_12m`,
+`target_window_eligible` is `true` and `below_trailing_12m_coverage` is absent.
+The current cache uses `openbess_canonical_1mw_2mwh` over 17,520 settlement
+periods from `2025-05-20T00:00:00Z` to `2026-05-20T00:00:00Z`.
+Use this trailing-12-month cache for headline review. The 90-day cache below is
+retained as a historical preview artefact only.
 
-For Release 1, `results/dashboard/release_90d_historical` is the canonical
-OpenBESS reference cache because it uses `openbess_canonical_1mw_2mwh` and meets
-the 90-day public annualisation gate. `trailing_12m` remains the preferred target
-window in metadata; when that target is not fully covered, canonical outputs
-carry `below_trailing_12m_coverage`.
+For `v0.1.1`, `results/dashboard/release_90d_historical` remains the 90-day
+OpenBESS preview reference cache. It uses the same canonical reference asset and
+meets the 90-day public annualisation gate, but it carries
+`below_trailing_12m_coverage` because the preferred target window is not fully
+covered.
 
 The existing `results/dashboard/commercial_trailing_12m` artefact is a generated
 commercial branch artefact using `commercial_phase4_3mw_10mwh`. It demonstrates
 longer coverage, but it is not the canonical OpenBESS reference asset cache.
 
 The dashboard should then run from cached files without solver, raw data or live
-API calls:
+API calls. To inspect the canonical trailing-12-month cache directly, point the
+dashboard reader at the cache directory from this checkout:
 
 ```bash
+GB_BESS_DASHBOARD_CACHE_DIR=results/dashboard/release_trailing_12m_historical uv run streamlit run dashboard/streamlit_app.py
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:GB_BESS_DASHBOARD_CACHE_DIR="results/dashboard/release_trailing_12m_historical"
 uv run streamlit run dashboard/streamlit_app.py
 ```
+
+`GB_BESS_DASHBOARD_CACHE_DIR` was introduced post-v0.1.1 to select named
+dashboard caches. Without it, the dashboard reads `results/dashboard`, which is
+useful for the short network-free smoke cache.
+
+The 90-day preview cache can still be inspected explicitly:
+
+```bash
+GB_BESS_DASHBOARD_CACHE_DIR=results/dashboard/release_90d_historical uv run streamlit run dashboard/streamlit_app.py
+```
+
+Expanded command path:
+
+```bash
+uv run gb-bess build-phase4-aligned-cache \
+  --start 2025-05-20T00:00:00Z \
+  --days 365 \
+  --output-dir results/runs/release_cache_trailing_12m_historical/aligned_sources
+
+uv run gb-bess run-release-cache \
+  --aligned-cache-dir results/runs/release_cache_trailing_12m_historical/aligned_sources \
+  --output-dir results/runs/release_cache_trailing_12m_historical \
+  --dashboard-dir results/dashboard/release_trailing_12m_historical \
+  --profile trailing12m \
+  --target-window-label trailing_12m
+```
+
+Treat that as a long-running release job rather than an interactive smoke
+command. The cache is publishable only after the manifest gate above passes.
+
+The `trailing12m` profile keeps the required central rolling policy,
+perfect-foresight capture comparison, stack-series windows, source snapshot,
+assumptions ledger, finance/degradation summaries and dashboard contract files.
+It skips supplementary smoke-window comparisons, scenario sweeps,
+forecast-error sweeps and forecast-model comparison rows so the full-year gate
+can be run as a release job without recomputing every diagnostic table.
+The canonical run uses 48 half-hour settlement periods per daily solve, executes
+48 periods per step and evaluates 365 daily steps with the previous-day
+same-period forecast.
 
 The dashboard imports only the cache reader/UI layer during normal load. Tests
 guard against importing source clients or solver modules from the dashboard.

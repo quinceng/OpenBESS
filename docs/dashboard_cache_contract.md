@@ -10,6 +10,13 @@ Dashboard artefacts live under:
 results/dashboard/
 ```
 
+The dashboard reads `results/dashboard/` by default. Set
+`GB_BESS_DASHBOARD_CACHE_DIR` to inspect a named generated cache such as
+`results/dashboard/release_trailing_12m_historical` or the historical
+`results/dashboard/release_90d_historical` preview cache.
+Use `release_trailing_12m_historical` for headline review; the 90-day cache is
+historical preview evidence only.
+
 The dashboard may also read small committed reference files under:
 
 ```text
@@ -148,9 +155,42 @@ window.
 
 The manifest also records `target_window_label`, `target_window_coverage_pct`
 and `target_window_eligible` under `stack_series`. Release 1 uses `trailing_12m`
-as the preferred target window while still allowing a canonical 90-day run to
-serve as the minimum public annualisation gate. Canonical runs below full
+as the preferred target window while still allowing a 90-day preview reference
+run to serve as the minimum public annualisation gate. Runs below full
 trailing-12-month coverage carry `below_trailing_12m_coverage`.
+
+The manifest records rolling-policy reproducibility metadata under
+`rolling_policy`: forecast model, terminal SoC policy and target, step count,
+horizon periods, executed step periods and solver failure count. This makes the
+headline capture ratio auditable without parsing `config_hash`.
+For the canonical trailing-12-month cache, 48 horizon periods means one day of
+half-hour settlement periods, 48 executed step periods means one daily action
+block, and 365 steps means 365 daily rolling decisions.
+
+The dashboard label is gated by those fields:
+
+- `target_window_label` is a string window label such as `trailing_12m`;
+- `target_window_coverage_pct` is a decimal fraction of expected periods
+  covered;
+- `target_window_eligible` is a boolean that must be `true` before the target is
+  considered met.
+
+The dashboard may use the full `OpenBESS Stack Index` label only when the
+primary window is `trailing_12m`, the target is eligible and
+`below_trailing_12m_coverage` is absent. A 90-day cache, including older
+manifests without target-window metadata, must remain labelled
+`OpenBESS Stack Index Preview`.
+
+For a trailing-12-month gate run, the required stages are central rolling policy,
+perfect-foresight capture comparison, stack-series window eligibility,
+degradation/finance summaries, source snapshot, assumptions ledger and the
+standard dashboard cache files. Smoke-window comparisons, scenario sweeps,
+forecast-error sweeps and forecast-model comparison rows are supplementary
+diagnostics; the CLI `trailing12m` profile may skip them, and skipped stages
+must be recorded in `summary.json` and caveats.
+When those supplementary diagnostic files are present but empty, the dashboard
+must surface that they were skipped for the release profile instead of silently
+hiding the section.
 
 ## 4. Executive Summary Schema
 

@@ -7,7 +7,7 @@ import pytest
 from click import unstyle
 from typer.testing import CliRunner
 
-from gb_bess_revenue_stack.cli import _cm_sidecar_for_asset, app
+from gb_bess_revenue_stack.cli import _cm_sidecar_for_asset, _release_cache_skipped_stages, app
 
 pytestmark = pytest.mark.unit
 
@@ -74,7 +74,27 @@ def test_cli_exposes_run_release_cache_subcommand() -> None:
     assert "--asset-id" in output
     assert "--cm-scenarios-yaml" in output
     assert "--horizon-periods" in output
+    assert "--profile" in output
+    assert "--skip-smoke-windows" in output
+    assert "--skip-forecast-model-comparison" in output
     assert "--target-window-label" in output
+
+
+def test_release_cache_trailing12m_profile_skips_supplementary_stages() -> None:
+    assert _release_cache_skipped_stages(profile="trailing12m") == {
+        "smoke_windows",
+        "scenario_sweep",
+        "forecast_error_sweep",
+        "forecast_model_comparison",
+    }
+
+
+def test_release_cache_full_profile_keeps_diagnostics_unless_flagged() -> None:
+    assert _release_cache_skipped_stages(profile="full") == set()
+    assert _release_cache_skipped_stages(
+        profile="full",
+        skip_forecast_error_sweep=True,
+    ) == {"forecast_error_sweep"}
 
 
 def test_cm_sidecar_selects_matching_duration_t4_scenario() -> None:

@@ -1,16 +1,30 @@
 # Phase 6 Review - Dashboard, Methodology and Release Hardening
 
-## Outcome
+## Post-Phase-6 Follow-Up
 
-Phase 6 may proceed with caveat. The release artefact now has a rebuilt
-canonical 90-day dashboard cache, explicit no-leakage forecast model comparison
-outputs, target-window metadata for the preferred trailing-12-month coverage
-path, and public docs that distinguish the canonical OpenBESS cache from the
-commercial trailing-12-month branch artefact.
+On 2026-05-22, release-story hardening generated the canonical
+`openbess_canonical_1mw_2mwh` trailing-12-month dashboard cache at
+`results/dashboard/release_trailing_12m_historical`. That later cache passed the
+`trailing_12m` manifest gate with `target_window_eligible=true` and no
+`below_trailing_12m_coverage` caveat. The Phase 6 findings below remain the
+historical review for the earlier `results/dashboard/release_90d_historical`
+preview cache, which still carries `below_trailing_12m_coverage`.
 
-## Built
+## Original Phase 6 Outcome
 
-- Rebuilt the canonical release cache at `results/dashboard/release_90d_historical`.
+At the v0.1.1 Phase 6 checkpoint, the preview artefact had a rebuilt 90-day
+dashboard cache, explicit no-leakage forecast model comparison outputs,
+target-window metadata for the preferred trailing-12-month coverage path, and
+public docs that distinguished the OpenBESS reference cache from the commercial
+trailing-12-month branch artefact.
+
+## Original Phase 6 Built
+
+- Post-Phase-6 follow-up now promotes
+  `results/dashboard/release_trailing_12m_historical`; the 90-day references in
+  this section are the original Phase 6 preview evidence.
+- Rebuilt the original 90-day preview release cache at
+  `results/dashboard/release_90d_historical`.
 - Added `forecast_model_comparison.parquet` and
   `forecast_model_comparison.csv` to the dashboard cache contract.
 - Added side-by-side previous-day versus trailing-mean forecast baseline
@@ -23,9 +37,9 @@ commercial trailing-12-month branch artefact.
 - Documented that `results/dashboard/commercial_trailing_12m` is a generated
   commercial branch artefact, not the canonical OpenBESS reference cache.
 
-## Release Cache Evidence
+## Original 90-Day Preview Cache Evidence
 
-Canonical cache:
+Original preview cache:
 
 ```text
 results/dashboard/release_90d_historical
@@ -37,7 +51,7 @@ Run ID:
 release_cache_elexon_mid_neso_eac_2026_02_01_0000_2026_05_02_0000_utc
 ```
 
-The rebuilt canonical cache uses `openbess_canonical_1mw_2mwh` over 4,320
+The rebuilt preview cache uses `openbess_canonical_1mw_2mwh` over 4,320
 settlement periods, equal to 2,160 hours. The primary stack-series window is
 `90d`; it is eligible for annualisation and public-index preview use. The target
 window is `trailing_12m`; target coverage is 0.2465753425 and is not yet
@@ -87,10 +101,10 @@ not as the canonical OpenBESS reference asset cache.
 | Commercial trailing-12-month artefact is labelled as branch evidence | Complete |
 | Phase 6 review exists | Complete |
 
-## Caveats
+## Original 90-Day Preview Caveats
 
-- The canonical OpenBESS cache still does not have full trailing-12-month
-  coverage. It carries `below_trailing_12m_coverage`.
+- The original 90-day Phase 6 cache did not have full trailing-12-month
+  coverage. It carried `below_trailing_12m_coverage`.
 - The trailing-mean forecast baseline is a transparent diagnostic, not a
   commercial forecasting product.
 - The Capacity Market value remains a scenario/reference sidecar.

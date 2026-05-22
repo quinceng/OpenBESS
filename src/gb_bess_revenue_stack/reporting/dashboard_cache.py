@@ -348,6 +348,19 @@ def _manifest(payload: Phase4DashboardCacheInput, paths: dict[str, Path]) -> dic
         "degradation_treatment": payload.degradation_treatment,
         "central_or_sensitivity": payload.central_or_sensitivity,
         "refresh_cadence": payload.refresh_cadence,
+        "rolling_policy": {
+            "forecast_model": payload.rolling_run.forecast_model,
+            "terminal_soc_policy": payload.rolling_run.terminal_soc_policy,
+            "terminal_soc_target_mwh": payload.rolling_run.terminal_soc_target_mwh,
+            "step_count": len(payload.rolling_run.steps),
+            "horizon_periods": payload.rolling_run.steps[0].horizon_period_count
+            if payload.rolling_run.steps
+            else None,
+            "step_periods": payload.rolling_run.steps[0].executed_period_count
+            if payload.rolling_run.steps
+            else None,
+            "solver_failure_count": payload.rolling_run.solver_failure_count,
+        },
         "stack_series": {
             "schema_version": payload.schema_version,
             "row_count": 2,

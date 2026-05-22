@@ -1,6 +1,12 @@
 # Known Limitations
 
-These limitations are part of the product, not footnotes to hide. They should appear in the README, methodology and dashboard where relevant.
+These limitations are part of the product, not footnotes to hide. They should
+appear in the README, methodology and dashboard where relevant.
+
+The current headline cache has trailing-12-month coverage for one historical
+year. That removes the older 90-day preview limitation for the mainline
+reference cache, but it does not create multi-year evidence or a forward market
+forecast.
 
 ## 1. Public-Data Price Proxy
 

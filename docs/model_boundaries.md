@@ -192,6 +192,13 @@ Not allowed:
 
 Dashboard is a cached explainer.
 
+The headline OpenBESS dashboard cache is
+`results/dashboard/release_trailing_12m_historical` when its manifest records
+the canonical reference asset, `primary_window_label=trailing_12m`,
+`target_window_eligible=true`, and no `below_trailing_12m_coverage` caveat.
+`results/dashboard/release_90d_historical` is retained as historical preview
+evidence only.
+
 Allowed:
 
 - select precomputed scenario;
@@ -218,6 +225,9 @@ Commercial BESS modelling is a separate branch namespace. It uses MW/MWh units
 and site export-limit assumptions. It should grow separately from residential
 modelling and from the central optimiser internals until a deliberate integration
 decision is made.
+Generated branch artefacts such as
+`results/dashboard/commercial_trailing_12m` must not be described as the
+canonical OpenBESS reference asset cache.
 
 Residential branch outputs must describe normal household direct market bidding
 as ineligible unless effective export capability reaches the relevant direct

@@ -109,6 +109,21 @@ def test_load_dashboard_cache_missing_files_fails_gracefully(tmp_path: Path) -> 
         load_dashboard_cache(tmp_path)
 
 
+def test_load_dashboard_cache_uses_env_cache_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write_minimal_dashboard_cache(tmp_path)
+    from dashboard.cache_reader import CACHE_DIR_ENV_VAR, load_dashboard_cache
+
+    monkeypatch.setenv(CACHE_DIR_ENV_VAR, str(tmp_path))
+
+    cache = load_dashboard_cache()
+
+    assert cache.cache_dir == tmp_path
+    assert cache.manifest["run_id"] == "dashboard-test"
+
+
 def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     _write_minimal_dashboard_cache(tmp_path)
     from dashboard.cache_reader import load_dashboard_cache
@@ -128,6 +143,7 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     assert model["has_finance_sensitivities"] is True
     assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
     assert model["stack_index"]["primary_window_label"] == "7d"
+    assert model["stack_index"]["target_window_label"] == "7d"
     assert model["stack_index"]["primary_coverage_pct"] == pytest.approx(1.0)
     assert model["stack_story_steps"] == [
         "Elexon BMRS MID wholesale proxy",
@@ -137,12 +153,142 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     ]
 
 
+def test_dashboard_view_model_keeps_90d_target_shortfall_labelled_preview(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_dashboard_cache(
+        tmp_path,
+        stack_series_window_label="90d",
+        stack_series_manifest={
+            "eligible_for_public_index": True,
+            "eligible_for_annualisation": True,
+            "target_window_label": "trailing_12m",
+            "target_window_eligible": False,
+            "target_window_coverage_pct": 0.2465753424657534,
+            "caveat_flags": ["below_trailing_12m_coverage", "not_a_market_index"],
+        },
+    )
+    from dashboard.cache_reader import load_dashboard_cache
+    from dashboard.streamlit_app import build_view_model
+
+    model = build_view_model(load_dashboard_cache(tmp_path))
+
+    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["primary_window_label"] == "90d"
+    assert model["stack_index"]["target_window_label"] == "trailing_12m"
+    assert "below_trailing_12m_coverage" in model["stack_index"]["caveat_flags"]
+
+
+def test_dashboard_view_model_keeps_legacy_90d_metadata_labelled_preview(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_dashboard_cache(
+        tmp_path,
+        stack_series_window_label="90d",
+        stack_series_manifest={
+            "eligible_for_public_index": True,
+            "eligible_for_annualisation": True,
+            "caveat_flags": ["not_a_market_index"],
+        },
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["stack_series"].pop("target_window_label", None)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    from dashboard.cache_reader import load_dashboard_cache
+    from dashboard.streamlit_app import build_view_model
+
+    model = build_view_model(load_dashboard_cache(tmp_path))
+
+    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["primary_window_label"] == "90d"
+    assert model["stack_index"]["target_window_label"] == "90d"
+
+
+def test_dashboard_view_model_promotes_eligible_trailing_12m_to_full_label(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_dashboard_cache(
+        tmp_path,
+        stack_series_window_label="trailing_12m",
+        stack_series_manifest={
+            "eligible_for_public_index": True,
+            "eligible_for_annualisation": True,
+            "target_window_label": "trailing_12m",
+            "target_window_eligible": True,
+            "target_window_coverage_pct": 1.0,
+            "caveat_flags": ["not_a_market_index"],
+        },
+    )
+    from dashboard.cache_reader import load_dashboard_cache
+    from dashboard.streamlit_app import build_view_model
+
+    model = build_view_model(load_dashboard_cache(tmp_path))
+
+    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index"
+    assert model["stack_index"]["primary_window_label"] == "trailing_12m"
+
+
+def test_dashboard_view_model_requires_explicit_trailing_12m_target_eligibility(
+    tmp_path: Path,
+) -> None:
+    _write_minimal_dashboard_cache(
+        tmp_path,
+        stack_series_window_label="trailing_12m",
+        stack_series_manifest={
+            "eligible_for_public_index": True,
+            "eligible_for_annualisation": True,
+            "caveat_flags": ["not_a_market_index"],
+        },
+    )
+    from dashboard.cache_reader import load_dashboard_cache
+    from dashboard.streamlit_app import build_view_model
+
+    model = build_view_model(load_dashboard_cache(tmp_path))
+
+    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["primary_window_label"] == "trailing_12m"
+
+
+def test_dashboard_explains_empty_trailing12m_diagnostics(tmp_path: Path) -> None:
+    _write_minimal_dashboard_cache(tmp_path)
+    pd.DataFrame().to_parquet(tmp_path / "forecast_model_comparison.parquet", index=False)
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["config_hash"] = (
+        "release-cache:openbess_canonical_1mw_2mwh:profile=trailing12m:"
+        "skipped=forecast_model_comparison"
+    )
+    manifest["files"]["forecast_model_comparison"] = "forecast_model_comparison.parquet"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    from dashboard.cache_reader import load_dashboard_cache
+    from dashboard.streamlit_app import _empty_optional_diagnostic_note
+
+    cache = load_dashboard_cache(tmp_path)
+
+    assert cache.forecast_model_comparison is not None
+    assert cache.forecast_model_comparison.empty
+    assert _empty_optional_diagnostic_note(
+        cache,
+        manifest_key="forecast_model_comparison",
+        label="Forecast model comparison",
+    ) == (
+        "Forecast model comparison rows are empty for this cache because the "
+        "trailing12m release profile skips supplementary diagnostics. See the "
+        "historical 90-day preview cache and Phase 6 review for side-by-side "
+        "diagnostic evidence."
+    )
+
+
 def _write_minimal_dashboard_cache(
     cache_dir: Path,
     *,
     include_stack_series: bool = True,
     stack_series_window_label: str = "7d",
     advertise_stack_series_csv: bool = False,
+    stack_series_manifest: dict[str, Any] | None = None,
 ) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     files = {
@@ -165,9 +311,11 @@ def _write_minimal_dashboard_cache(
                 "run_id": "dashboard-test",
                 "stack_series": {
                     "primary_window_label": stack_series_window_label,
+                    "target_window_label": stack_series_window_label,
                     "eligible_for_public_index": False,
                     "eligible_for_annualisation": False,
                     "caveat_flags": ["not_a_market_index"],
+                    **(stack_series_manifest or {}),
                 },
                 "files": files,
             }

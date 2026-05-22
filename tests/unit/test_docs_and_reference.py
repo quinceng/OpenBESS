@@ -91,6 +91,56 @@ def test_release_hardening_files_exist() -> None:
     assert (ROOT / "docs/phase_reviews/phase_6_review.md").is_file()
 
 
+def test_public_process_evidence_docs_exist() -> None:
+    for relative_path in [
+        "docs/product_plan.md",
+        "docs/quality_gates.md",
+        "docs/release_checklist.md",
+        "docs/source_research_notes.md",
+        "docs/validation_memo.md",
+        "docs/phase_reviews/README.md",
+        "docs/phase_reviews/p1_00_source_feasibility.md",
+        "docs/phase_reviews/phase_1_review.md",
+        "docs/phase_reviews/phase_2_review.md",
+        "docs/phase_reviews/phase_2_5_review.md",
+        "docs/phase_reviews/phase_3_review.md",
+        "docs/phase_reviews/phase_4_review.md",
+        "docs/phase_reviews/phase_5_review.md",
+        "docs/phase_reviews/phase_6_review.md",
+    ]:
+        assert (ROOT / relative_path).is_file()
+
+
+def test_phase6_review_records_trailing_12m_follow_up() -> None:
+    review = (ROOT / "docs/phase_reviews/phase_6_review.md").read_text(encoding="utf-8")
+
+    assert "Post-Phase-6 Follow-Up" in review
+    assert "results/dashboard/release_trailing_12m_historical" in review
+    assert "target_window_eligible=true" in review
+    assert "results/dashboard/release_90d_historical" in review
+    assert "below_trailing_12m_coverage" in review
+
+
+def test_verified_source_assumptions_are_reconciled() -> None:
+    ledger = (ROOT / "docs/assumptions_ledger.md").read_text(encoding="utf-8")
+
+    expected_sources = {
+        "A-WHOLESALE-001": "ELEXON_BMRS_MID",
+        "A-EAC-002": "NESO_EAC_AUCTION_RESULTS",
+        "A-EAC-004": "NESO_EAC_AUCTION_RESULTS",
+    }
+
+    for assumption_id, source_id in expected_sources.items():
+        matching_rows = [
+            line for line in ledger.splitlines() if line.startswith(f"| {assumption_id}")
+        ]
+
+        assert len(matching_rows) == 1
+        assert "central_default" in matching_rows[0]
+        assert "phase1_required" not in matching_rows[0]
+        assert source_id in matching_rows[0]
+
+
 def test_release_version_docs_match_package_version() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     version = pyproject["project"]["version"]
@@ -155,3 +205,31 @@ def test_openbess_stack_index_is_referenced_by_boundary_docs() -> None:
     assert "asset actually solved in the cache" in cache_contract
     assert "duplicate fixed 90-day" in cache_contract
     assert "suppressed/null until stack-series coverage gates pass" in cache_contract
+
+
+def test_release_docs_pin_preview_cache_and_trailing_12m_target() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    reproducibility = (ROOT / "docs/reproducibility.md").read_text(encoding="utf-8")
+    cache_contract = (ROOT / "docs/dashboard_cache_contract.md").read_text(encoding="utf-8")
+    quality_gates = (ROOT / "docs/quality_gates.md").read_text(encoding="utf-8")
+    release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
+
+    for doc in [readme, reproducibility]:
+        assert "results/dashboard/release_90d_historical" in doc
+        assert "results/dashboard/release_trailing_12m_historical" in doc
+        assert "below_trailing_12m_coverage" in doc
+        assert "GB_BESS_DASHBOARD_CACHE_DIR" in doc
+
+    assert "canonical trailing-12-month dashboard cache" in readme
+    assert "current main-branch evidence generated after the\n`v0.1.1` tag" in readme
+    assert "long-running release job over live public APIs" in readme
+    assert "90-day preview cache" in reproducibility
+    assert "long-running release job" in reproducibility
+    assert "--profile trailing12m" in reproducibility
+    assert "90-day preview reference\nrun" in cache_contract
+    assert "target_window_eligible" in cache_contract
+    assert "`rolling_policy`: forecast model" in cache_contract
+    assert "supplementary diagnostics" in cache_contract.replace("\n", " ")
+    assert "present but empty" in cache_contract
+    assert "OpenBESS Stack Index Preview` to `OpenBESS Stack Index" in quality_gates
+    assert "target_window_eligible" in release_checklist

@@ -532,6 +532,9 @@ def test_phase6_cache_prefers_eligible_trailing_12m_target_window(tmp_path: Path
     assert manifest["stack_series"]["primary_window_label"] == "trailing_12m"
     assert manifest["stack_series"]["target_window_label"] == "trailing_12m"
     assert manifest["stack_series"]["target_window_eligible"] is True
+    assert manifest["rolling_policy"]["forecast_model"] == "oracle_diagnostic"
+    assert manifest["rolling_policy"]["horizon_periods"] == 4
+    assert manifest["rolling_policy"]["step_periods"] == 4
     assert "below_trailing_12m_coverage" not in manifest["stack_series"]["caveat_flags"]
 
 

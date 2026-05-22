@@ -1,14 +1,13 @@
 # OpenBESS Stack Index
 
-The OpenBESS Stack Index Preview is a public-data educational series for a
-reference GB battery energy storage asset. It is not an official market index,
-not investment advice, not a proprietary benchmark replication and not a
-bankable revenue forecast.
+The OpenBESS Stack Index is a public-data educational series for a reference GB
+battery energy storage asset. It is not an official market index and not investment advice.
+It is not a proprietary benchmark replication and not a bankable revenue forecast.
 
 The public-facing name is OpenBESS Stack Index, but every named output must
 carry `not_a_market_index` until and unless a future governance process creates
-an independently maintained index. Preview outputs should be labelled as a
-preview unless the coverage gates below pass.
+an independently maintained index. Short-window outputs should be labelled
+`OpenBESS Stack Index Preview` unless the coverage gates below pass.
 
 ## Reference Assets
 
@@ -86,7 +85,11 @@ Annualisation is allowed only for eligible longer windows. The 90d gate is the
 minimum public annualisation gate; shorter windows can be shown as preview or
 diagnostic samples but should not be annualised as public headline values.
 Annualised finance and benchmark model fields are suppressed/null until coverage gates pass.
-Trailing 12m is the preferred public window once available.
+Trailing 12m is the preferred public window. The canonical
+`release_trailing_12m_historical` cache now passes that preferred gate and may
+use the full OpenBESS Stack Index label only when its manifest records
+`primary_window_label=trailing_12m`, `target_window_eligible=true` and no
+`below_trailing_12m_coverage` caveat.
 
 If a window is annualised from a partial sample, outputs must carry
 `partial_sample_annualised` and explain that the value depends on the observed

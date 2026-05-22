@@ -14,6 +14,11 @@ This ledger records numerical and modelling assumptions that affect project outp
 | `branch_default` | Default for a non-central modelling branch; not part of central Release 1 results. |
 | `excluded` | Explicitly outside Release 1. |
 
+Elexon MID and NESO EAC auction results have closed the Phase 1 source gate for
+the rows marked `central_default`. CM derating details and EAC market-rule rows
+that still require public rule verification remain `phase1_required` instead of
+being silently promoted.
+
 ## Assumption Register
 
 | ID | Area | Assumption or policy | Unit | Status | Source ID | Sensitivity range | Caveat |
@@ -21,15 +26,15 @@ This ledger records numerical and modelling assumptions that affect project outp
 | A-TIME-001 | Time | Canonical processing uses timezone-aware UTC. | policy | central_default | PROJECT_CONVENTION | none | Local time is display only. |
 | A-TIME-002 | Time | Delivery intervals are start-inclusive and end-exclusive. | policy | central_default | PROJECT_CONVENTION | none | Required for settlement-period alignment. |
 | A-TIME-003 | Rolling | Rolling inputs must satisfy `known_at_utc <= decision_time_utc`. | policy | central_default | PROJECT_CONVENTION | none | Conservative known-at proxy required if source lacks publication time. |
-| A-ASSET-001 | Asset | Reference asset is 2-hour BESS. | hours | phase1_required | PROJECT_CONVENTION | 1h, 2h, 4h | Central MW/MWh values to be set in config. |
+| A-ASSET-001 | Asset | Canonical reference asset is `openbess_canonical_1mw_2mwh`. | hours | central_default | PROJECT_CONVENTION | 1h, 2h, 4h | Reference asset is a modelling object, not a site-specific claim. |
 | A-ASSET-002 | Asset | Market variables are AC MW and SoC is internal MWh. | policy | central_default | PROJECT_CONVENTION | none | Must be visible in methodology. |
 | A-EFF-001 | Efficiency | If only round-trip efficiency is provided, split using square root. | fraction | central_default | PROJECT_CONVENTION | charge/discharge asymmetric case | Conversion must be recorded in manifest. |
-| A-WHOLESALE-001 | Wholesale | Elexon BMRS MID is central public wholesale proxy unless replaced by verified better source. | GBP/MWh | phase1_required | ELEXON_BMRS_MID | N2EXMIDP, APXMIDP | Must not be labelled day-ahead execution price. |
+| A-WHOLESALE-001 | Wholesale | Elexon BMRS MID is central public wholesale proxy unless replaced by verified better source. | GBP/MWh | central_default | ELEXON_BMRS_MID | N2EXMIDP, APXMIDP | Source feasibility is verified; must not be labelled day-ahead execution price. |
 | A-WHOLESALE-002 | Wholesale | Negative prices are valid observations. | policy | central_default | PROJECT_CONVENTION | none | Missing prices require explicit quality flag. |
 | A-EAC-001 | EAC | EAC model is price-taking availability proxy. | policy | central_default | NESO_EAC_AUCTION_RESULTS | none | Not auction clearing or strategic bidding. |
-| A-EAC-002 | EAC | DC/DM/DR are expected central candidates if source fields verify labels, directions and windows. | policy | phase1_required | NESO_EAC_AUCTION_RESULTS | product subsets | Do not hard-code durations before verification. |
+| A-EAC-002 | EAC | Verified NESO EAC source product labels may be used for price-taking availability scenarios where service definitions are mapped in reference data. | policy | central_default | NESO_EAC_AUCTION_RESULTS | product subsets | Publication-time and detailed market-rule caveats still apply. |
 | A-EAC-003 | EAC | BR/QR/SR are source-gated optional products. | policy | sensitivity_only | NESO_EAC_AUCTION_RESULTS | include/exclude by product | Include only if definitions, units and windows are verified. |
-| A-EAC-004 | EAC | Availability prices are converted to GBP/MW/h. | GBP/MW/h | phase1_required | NESO_EAC_AUCTION_RESULTS | source-unit alternatives | Conversion must be tested. |
+| A-EAC-004 | EAC | Availability prices are converted to GBP/MW/h. | GBP/MW/h | central_default | NESO_EAC_AUCTION_RESULTS | source-unit alternatives | NESO source metadata is verified; conversion remains covered by tests. |
 | A-EAC-005 | EAC | Idle reserve holding is physically allowed subject to power and SoC feasibility. | policy | central_default | PROJECT_CONVENTION | none | Reserve eligibility is not tied to scheduled dispatch mode. |
 | A-EAC-006 | EAC | Upward reserve AC MW requires stored energy divided by discharge efficiency. | MWh | central_default | PROJECT_CONVENTION | alternative convention diagnostic | Assumes delivered AC reserve convention. |
 | A-EAC-007 | EAC | Downward reserve AC MW requires empty capacity multiplied by charge efficiency. | MWh | central_default | PROJECT_CONVENTION | alternative convention diagnostic | Assumes imported AC reserve convention. |

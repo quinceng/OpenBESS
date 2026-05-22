@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -8,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 DEFAULT_CACHE_DIR = Path("results/dashboard")
+CACHE_DIR_ENV_VAR = "GB_BESS_DASHBOARD_CACHE_DIR"
 
 REQUIRED_FILES = {
     "manifest": "manifest.json",
@@ -82,10 +84,17 @@ class DashboardCache:
     source_snapshot: dict[str, Any] | None = None
 
 
-def load_dashboard_cache(cache_dir: str | Path = DEFAULT_CACHE_DIR) -> DashboardCache:
+def default_dashboard_cache_dir() -> Path:
+    """Return the dashboard cache directory selected for this process."""
+
+    configured = os.environ.get(CACHE_DIR_ENV_VAR)
+    return Path(configured) if configured else DEFAULT_CACHE_DIR
+
+
+def load_dashboard_cache(cache_dir: str | Path | None = None) -> DashboardCache:
     """Load dashboard cache files without importing solvers or source clients."""
 
-    root = Path(cache_dir)
+    root = Path(cache_dir) if cache_dir is not None else default_dashboard_cache_dir()
     missing = [filename for filename in REQUIRED_FILES.values() if not (root / filename).is_file()]
     if missing:
         joined = ", ".join(sorted(missing))

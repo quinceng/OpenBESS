@@ -3,10 +3,11 @@ from __future__ import annotations
 import csv
 import json
 import math
+import time
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 import typer
 from pydantic import ValidationError
@@ -95,10 +96,49 @@ from gb_bess_revenue_stack.schemas.market import WholesalePricePoint
 
 app = typer.Typer(help="GB BESS Phase 1 data-foundation commands.", no_args_is_help=True)
 
+ReleaseCacheProfile = Literal["full", "trailing12m"]
+SUPPLEMENTARY_RELEASE_STAGES = frozenset(
+    {
+        "smoke_windows",
+        "scenario_sweep",
+        "forecast_error_sweep",
+        "forecast_model_comparison",
+    }
+)
+
 
 @app.callback()
 def main() -> None:
     """GB BESS Phase 1 command group."""
+
+
+def _release_cache_skipped_stages(
+    *,
+    profile: ReleaseCacheProfile,
+    skip_smoke_windows: bool = False,
+    skip_scenarios: bool = False,
+    skip_forecast_error_sweep: bool = False,
+    skip_forecast_model_comparison: bool = False,
+) -> set[str]:
+    skipped = set(SUPPLEMENTARY_RELEASE_STAGES) if profile == "trailing12m" else set()
+    if skip_smoke_windows:
+        skipped.add("smoke_windows")
+    if skip_scenarios:
+        skipped.add("scenario_sweep")
+    if skip_forecast_error_sweep:
+        skipped.add("forecast_error_sweep")
+    if skip_forecast_model_comparison:
+        skipped.add("forecast_model_comparison")
+    return skipped
+
+
+def _stage_start(label: str) -> float:
+    typer.echo(f"[release-cache] starting {label}")
+    return time.monotonic()
+
+
+def _stage_done(label: str, started_at: float) -> None:
+    typer.echo(f"[release-cache] finished {label} in {time.monotonic() - started_at:.1f}s")
 
 
 @app.command()
@@ -436,6 +476,31 @@ def run_release_cache(
         int,
         typer.Option(help="Executed periods per rolling solve."),
     ] = 48,
+    profile: Annotated[
+        ReleaseCacheProfile,
+        typer.Option(
+            help=(
+                "Release run profile. 'full' keeps every supplementary diagnostic; "
+                "'trailing12m' keeps required gate outputs and skips expensive diagnostics."
+            )
+        ),
+    ] = "full",
+    skip_smoke_windows: Annotated[
+        bool,
+        typer.Option(help="Skip 24h/48h/7d supplementary smoke-window comparisons."),
+    ] = False,
+    skip_scenarios: Annotated[
+        bool,
+        typer.Option(help="Skip supplementary market-stack scenario sweeps."),
+    ] = False,
+    skip_forecast_error_sweep: Annotated[
+        bool,
+        typer.Option(help="Skip supplementary deterministic forecast-error sweeps."),
+    ] = False,
+    skip_forecast_model_comparison: Annotated[
+        bool,
+        typer.Option(help="Skip supplementary forecast-model comparison rows."),
+    ] = False,
     target_window_label: Annotated[
         StackSeriesWindowLabel,
         typer.Option(help="Preferred coverage window for public release metadata."),
@@ -448,7 +513,16 @@ def run_release_cache(
     if horizon_periods <= 0 or step_periods <= 0:
         raise typer.BadParameter("horizon_periods and step_periods must be positive.")
 
+    skipped_stages = _release_cache_skipped_stages(
+        profile=profile,
+        skip_smoke_windows=skip_smoke_windows,
+        skip_scenarios=skip_scenarios,
+        skip_forecast_error_sweep=skip_forecast_error_sweep,
+        skip_forecast_model_comparison=skip_forecast_model_comparison,
+    )
+
     output_dir.mkdir(parents=True, exist_ok=True)
+    started_at = _stage_start("source alignment/load")
     if aligned_cache_dir is None:
         start_utc = parse_source_datetime(start)
         aligned = fetch_aligned_phase4_cache(
@@ -462,6 +536,7 @@ def run_release_cache(
         write_aligned_phase4_cache(aligned, aligned_cache_dir)
     else:
         aligned = load_aligned_phase4_cache(aligned_cache_dir)
+    _stage_done("source alignment/load", started_at)
 
     sample = aligned.sample
     registry = load_reference_assets(reference_assets_yaml)
@@ -475,6 +550,7 @@ def run_release_cache(
         terminal_soc_target_mwh=initial_soc_mwh,
     )
     forecast_model = PreviousDaySamePeriodForecast()
+    started_at = _stage_start("central rolling policy")
     rolling_run = run_rolling_market_stack_policy(
         prices=sample.prices,
         eac_price_matrix=sample.eac_price_matrix,
@@ -483,6 +559,8 @@ def run_release_cache(
         forecast_model=forecast_model,
         config=rolling_config,
     )
+    _stage_done("central rolling policy", started_at)
+    started_at = _stage_start("perfect-foresight capture comparison")
     capture = run_phase4_market_stack_capture_comparison(
         prices=sample.prices,
         eac_price_matrix=sample.eac_price_matrix,
@@ -493,40 +571,66 @@ def run_release_cache(
         terminal_soc_target_mwh=rolling_config.terminal_soc_target_mwh,
         solver_config=rolling_config.solver,
     )
-    smoke_window_comparisons = run_phase4_smoke_window_comparisons(
-        prices=sample.prices,
-        eac_price_matrix=sample.eac_price_matrix,
-        asset=asset,
-        initial_soc_mwh=initial_soc_mwh,
-        forecast_model=forecast_model,
-        config=rolling_config,
-        window_day_counts=[1, 2, 7],
-    )
-    sweep = run_phase4_market_stack_sweep(
-        prices=sample.prices,
-        eac_price_matrix=sample.eac_price_matrix,
-        asset=asset,
-        initial_soc_mwh=initial_soc_mwh,
-        forecast_model=forecast_model,
-        config=rolling_config,
-        scenarios=default_phase4_market_stack_scenarios(),
-    )
-    forecast_error_results = run_phase4_forecast_error_sweep(
-        prices=sample.prices,
-        eac_price_matrix=sample.eac_price_matrix,
-        asset=asset,
-        initial_soc_mwh=initial_soc_mwh,
-        forecast_model=forecast_model,
-        config=rolling_config,
-        scenarios=default_phase4_forecast_error_scenarios(),
-    )
-    forecast_model_comparison_results = run_phase4_forecast_model_comparison(
-        prices=sample.prices,
-        eac_price_matrix=sample.eac_price_matrix,
-        asset=asset,
-        initial_soc_mwh=initial_soc_mwh,
-        config=rolling_config,
-    )
+    _stage_done("perfect-foresight capture comparison", started_at)
+    if "smoke_windows" in skipped_stages:
+        typer.echo("[release-cache] skipped smoke-window comparisons")
+        smoke_window_comparisons = []
+    else:
+        started_at = _stage_start("smoke-window comparisons")
+        smoke_window_comparisons = run_phase4_smoke_window_comparisons(
+            prices=sample.prices,
+            eac_price_matrix=sample.eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            forecast_model=forecast_model,
+            config=rolling_config,
+            window_day_counts=[1, 2, 7],
+        )
+        _stage_done("smoke-window comparisons", started_at)
+    if "scenario_sweep" in skipped_stages:
+        typer.echo("[release-cache] skipped scenario sweep")
+        scenario_results = []
+    else:
+        started_at = _stage_start("scenario sweep")
+        sweep = run_phase4_market_stack_sweep(
+            prices=sample.prices,
+            eac_price_matrix=sample.eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            forecast_model=forecast_model,
+            config=rolling_config,
+            scenarios=default_phase4_market_stack_scenarios(),
+        )
+        scenario_results = sweep.scenario_results
+        _stage_done("scenario sweep", started_at)
+    if "forecast_error_sweep" in skipped_stages:
+        typer.echo("[release-cache] skipped forecast-error sweep")
+        forecast_error_results = []
+    else:
+        started_at = _stage_start("forecast-error sweep")
+        forecast_error_results = run_phase4_forecast_error_sweep(
+            prices=sample.prices,
+            eac_price_matrix=sample.eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            forecast_model=forecast_model,
+            config=rolling_config,
+            scenarios=default_phase4_forecast_error_scenarios(),
+        )
+        _stage_done("forecast-error sweep", started_at)
+    if "forecast_model_comparison" in skipped_stages:
+        typer.echo("[release-cache] skipped forecast-model comparison")
+        forecast_model_comparison_results = []
+    else:
+        started_at = _stage_start("forecast-model comparison")
+        forecast_model_comparison_results = run_phase4_forecast_model_comparison(
+            prices=sample.prices,
+            eac_price_matrix=sample.eac_price_matrix,
+            asset=asset,
+            initial_soc_mwh=initial_soc_mwh,
+            config=rolling_config,
+        )
+        _stage_done("forecast-model comparison", started_at)
     cm_label, cm_value, cm_source_id, cm_source_url, cm_notes = _cm_sidecar_for_asset(
         cm_scenarios_yaml=cm_scenarios_yaml,
         asset_duration_hours=reference.cm_duration_hours,
@@ -537,15 +641,25 @@ def run_release_cache(
         "Release cache outputs remain preview-labelled until coverage gates pass.",
         "Capacity Market value is an annual scenario sidecar.",
     ]
+    if skipped_stages:
+        caveats.append(
+            "Supplementary release diagnostics skipped by profile or CLI flag: "
+            + ", ".join(sorted(skipped_stages))
+            + "."
+        )
+    started_at = _stage_start("dashboard cache write")
     write_phase4_dashboard_cache(
         Phase4DashboardCacheInput(
             run_id=f"release_cache_{sample.label}",
             rolling_run=rolling_run,
             central_capture=capture,
             smoke_comparisons=smoke_window_comparisons,
-            scenario_results=sweep.scenario_results,
+            scenario_results=scenario_results,
             caveats=caveats,
-            config_hash=f"release-cache:{asset_id}:{rolling_config.model_dump_json()}",
+            config_hash=(
+                f"release-cache:{asset_id}:{rolling_config.model_dump_json()}:"
+                f"profile={profile}:skipped={','.join(sorted(skipped_stages)) or 'none'}"
+            ),
             source_snapshot_hash=sample.source_snapshot_hash,
             input_run_ids=[sample.label],
             source_ids=sample.source_ids,
@@ -567,6 +681,7 @@ def run_release_cache(
         ),
         dashboard_dir,
     )
+    _stage_done("dashboard cache write", started_at)
     (output_dir / "summary.json").write_text(
         json.dumps(
             {
@@ -574,6 +689,8 @@ def run_release_cache(
                 "period_count": len(sample.prices),
                 "sample_hours": sample.sample_hours,
                 "asset_id": asset_id,
+                "release_profile": profile,
+                "skipped_stages": sorted(skipped_stages),
                 "rolling_total_revenue_gbp": rolling_run.realised_total_revenue_gbp,
                 "perfect_total_revenue_gbp": capture.perfect_total_revenue_gbp,
                 "capture_ratio": capture.capture_ratio,

@@ -13,15 +13,25 @@ results/runs/
 results/dashboard/
 reports/generated/
 reports/phase_*/
+
+# Keep detailed implementation plans local unless they are rewritten as public
+# process evidence. Phase reviews and release/process gates below are public.
 docs/phase_*_plan.md
 docs/phase_reviews/*
 !docs/phase_reviews/
-!docs/phase_reviews/phase_6_review.md
+!docs/phase_reviews/README.md
+!docs/phase_reviews/p1_00_source_feasibility.md
+!docs/phase_reviews/phase_*_review.md
 docs/product_plan*.md
 docs/quality_gates.md
 docs/release_checklist.md
 docs/source_research_notes.md
 docs/strategic_positioning.md
 docs/validation_memo.md
+!docs/product_plan.md
+!docs/quality_gates.md
+!docs/release_checklist.md
+!docs/source_research_notes.md
+!docs/validation_memo.md
 *.parquet
 *.log
