@@ -226,6 +226,14 @@ def test_release_docs_pin_preview_cache_and_trailing_12m_target() -> None:
         "Release evidence and generated outputs live in the release notes and\nreproducibility docs"
     )
     assert readme_release_pointer in readme
+    assert "## Contribution" in readme
+    assert "open, auditable baseline" in readme
+    assert "energy-industry\nreaders" in readme
+    assert "research, education and commercial analysis" in readme
+    assert "shared open\nreference rather than only against undisclosed internal models" in readme
+    assert "not a substitute for site-specific\ncommercial due diligence" in readme
+    assert "not as an\nofficial market index, a tradable benchmark" in readme
+    assert "analysts, researchers, students and engineering teams" in readme
     assert "Optional local viewer for cached outputs" in readme
     assert "For cache rebuilds or selecting named caches" in readme
     assert "## Key Results" not in readme

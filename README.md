@@ -17,6 +17,21 @@ replication.
 Release evidence and generated outputs live in the release notes and
 reproducibility docs, not in this README.
 
+## Contribution
+
+OpenBESS contributes an open, auditable baseline for analysing Great Britain
+battery energy storage revenue stacks from public data. For energy-industry
+readers, it makes source provenance, modelling assumptions and known-at-time
+policy handling inspectable so methods can be compared against a shared open
+reference rather than only against undisclosed internal models.
+
+For research, education and commercial analysis, OpenBESS provides a
+reproducible starting point for studying storage economics, data governance,
+dispatch constraints and scenario comparison. Its purpose is to improve technical
+transparency and comparability; it is not a substitute for site-specific
+commercial due diligence, procurement advice, financing analysis or trading
+operations.
+
 ## What The Model Does
 
 OpenBESS models a reference GB BESS against a deliberately narrow public-data
@@ -34,21 +49,28 @@ known at the decision time:
 known_at_utc <= decision_time_utc
 ```
 
-The rolling policy evidence is intentionally auditable rather than commercial.
+The rolling policy evidence is intentionally auditable rather than operational
+or decision-grade.
 Release notes and methodology docs describe the forecast baselines and
 supplementary diagnostics for each published cache.
 
 ## OpenBESS Stack Index
 
-The OpenBESS Stack Index is a reference Great Britain battery metric built from
-public-source cache files. It reports a rolling value view with separate
-components for wholesale proxy value, EAC availability value, Capacity Market
-scenarios and a degradation-adjusted view.
+The OpenBESS Stack Index is a reference view of Great Britain battery revenue
+components computed from public-source cache files. It is published as an open
+methodology and reproducible artefact for technical comparison, not as an
+official market index, a tradable benchmark or a replication of any proprietary
+index.
 
 The index is intentionally cautious. Short data samples stay labelled as
-preview evidence. Annualised finance outputs and public benchmark comparisons
-remain caveated because they are scenario appraisals, not proprietary benchmark
-replication or bankability analysis.
+preview evidence. Annualised summary figures and public benchmark anchor
+comparisons remain caveated because they are scenario comparisons, not
+proprietary benchmark replication or bankability analysis.
+
+OpenBESS is intended for analysts, researchers, students and engineering teams
+who want a documented public-data starting point for GB BESS revenue analysis.
+It is not intended to inform investment, financing, procurement or trading
+decisions.
 
 ## Current Scope
 
@@ -71,7 +93,7 @@ files rather than calling live data sources or solving models when the page
 loads.
 
 It also includes residential battery examples, including household bill
-simulation, payback scenarios, and named sensitivity runs.
+simulation, illustrative payback calculations, and named sensitivity runs.
 
 ## Repository Layout
 
