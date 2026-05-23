@@ -1,33 +1,62 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360" role="img" aria-labelledby="title desc">
   <title id="title">OpenBESS trailing-12-month Stack Index evidence</title>
-  <desc id="desc">A compact chart showing the canonical trailing-12-month cache: perfect foresight GBP 49,439, previous-day rolling policy GBP 17,402, degradation-adjusted rolling value GBP 12,053, 35.2 percent capture and full trailing-12-month coverage.</desc>
-  <rect width="920" height="360" fill="#f8fafc"/>
-  <rect x="26" y="26" width="868" height="308" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
-  <text x="54" y="70" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#0f172a">OpenBESS Stack Index</text>
-  <text x="54" y="98" font-family="Arial, sans-serif" font-size="15" fill="#475569">Canonical trailing-12m cache, 2025-05-20 to 2026-05-20 UTC, openbess_canonical_1mw_2mwh</text>
+  <desc id="desc">OpenBESS v0.1.2 release evidence for the canonical trailing-12-month cache. Rolling policy value is GBP 17,402, degradation-adjusted rolling value is GBP 12,053, perfect-foresight upper-bound value is GBP 49,439, rolling capture is 35.2 percent, the trailing-12-month gate passed with 17,520 settlement periods and zero solver failures.</desc>
 
-  <text x="54" y="142" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#334155">Reference asset evidence</text>
-  <line x1="54" y1="282" x2="650" y2="282" stroke="#94a3b8"/>
+  <defs>
+    <filter id="cardShadow" x="-5%" y="-8%" width="110%" height="116%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+  </defs>
 
-  <rect x="86" y="199" width="94" height="83" fill="#0f766e"/>
-  <text x="133" y="306" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#334155">Rolling</text>
-  <text x="133" y="187" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle" fill="#0f766e">GBP 17,402</text>
+  <rect x="24" y="24" width="872" height="320" rx="10" fill="#ffffff" stroke="#e2e8f0" filter="url(#cardShadow)"/>
 
-  <rect x="276" y="225" width="94" height="57" fill="#2563eb"/>
-  <text x="323" y="306" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#334155">Deg.-adjusted</text>
-  <text x="323" y="213" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle" fill="#2563eb">GBP 12,053</text>
+  <text x="54" y="64" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">OpenBESS Stack Index</text>
+  <text x="54" y="90" font-family="Arial, sans-serif" font-size="13" fill="#475569">Trailing-12m cache - 2025-05-20 to 2026-05-20 UTC - openbess_canonical_1mw_2mwh</text>
+  <text x="866" y="64" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="end" fill="#0f766e">v0.1.2 release evidence</text>
 
-  <rect x="466" y="48" width="94" height="234" fill="#d97706"/>
-  <text x="513" y="306" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#334155">Perfect foresight</text>
-  <text x="513" y="36" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle" fill="#d97706">GBP 49,439</text>
-  <text x="513" y="323" font-family="Arial, sans-serif" font-size="11" text-anchor="middle" fill="#64748b">upper bound</text>
+  <text x="70" y="122" font-family="Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" fill="#64748b">STACK COMPONENTS - GBP/YEAR</text>
 
-  <rect x="690" y="86" width="148" height="148" rx="74" fill="#2563eb"/>
-  <circle cx="764" cy="160" r="48" fill="#ffffff"/>
-  <text x="764" y="150" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle" fill="#0f172a">35.2%</text>
-  <text x="764" y="174" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#475569">rolling capture</text>
-  <text x="764" y="252" font-family="Arial, sans-serif" font-size="13" text-anchor="middle" fill="#334155">trailing-12m gate passed</text>
-  <text x="764" y="274" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#64748b">17,520 settlement periods</text>
+  <g stroke="#e2e8f0" stroke-width="1">
+    <line x1="70" y1="256.4" x2="552" y2="256.4"/>
+    <line x1="70" y1="226.8" x2="552" y2="226.8"/>
+    <line x1="70" y1="197.2" x2="552" y2="197.2"/>
+    <line x1="70" y1="167.6" x2="552" y2="167.6"/>
+    <line x1="70" y1="138.0" x2="552" y2="138.0"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="10" text-anchor="end" fill="#64748b">
+    <text x="62" y="259.4">10k</text>
+    <text x="62" y="229.8">20k</text>
+    <text x="62" y="200.2">30k</text>
+    <text x="62" y="170.6">40k</text>
+    <text x="62" y="141.0">50k</text>
+  </g>
+  <line x1="70" y1="286" x2="552" y2="286" stroke="#94a3b8" stroke-width="1.25"/>
 
-  <text x="54" y="330" font-family="Arial, sans-serif" font-size="12" fill="#64748b">Caveats: wholesale proxy, price-taking EAC availability, BM excluded, CM scenario sidecar, finance is not bankability, not an official market index.</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="104" y="234.5" width="78" height="51.5" rx="3" fill="#0f766e"/>
+    <text x="143" y="223" font-size="12" font-weight="700" text-anchor="middle" fill="#0f766e">GBP 17,402</text>
+    <text x="143" y="307" font-size="12" text-anchor="middle" fill="#334155">Rolling</text>
+
+    <rect x="250" y="250.3" width="78" height="35.7" rx="3" fill="#2563eb"/>
+    <text x="289" y="239" font-size="12" font-weight="700" text-anchor="middle" fill="#2563eb">GBP 12,053</text>
+    <text x="289" y="307" font-size="12" text-anchor="middle" fill="#334155">Deg-adjusted</text>
+
+    <rect x="396" y="139.7" width="78" height="146.3" rx="3" fill="#d97706"/>
+    <line x1="390" y1="139.7" x2="480" y2="139.7" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="435" y="128" font-size="12" font-weight="700" text-anchor="middle" fill="#d97706">GBP 49,439</text>
+    <text x="435" y="307" font-size="12" text-anchor="middle" fill="#334155">Perfect foresight</text>
+    <text x="435" y="321" font-size="10" font-style="italic" text-anchor="middle" fill="#64748b">upper bound</text>
+  </g>
+
+  <g font-family="Arial, sans-serif">
+    <circle cx="738" cy="204" r="64" fill="none" stroke="#e2e8f0" stroke-width="18"/>
+    <circle cx="738" cy="204" r="64" fill="none" stroke="#0f766e" stroke-width="18" stroke-linecap="round" stroke-dasharray="141.55 260.57" transform="rotate(-90 738 204)"/>
+    <text x="738" y="202" font-size="28" font-weight="700" text-anchor="middle" fill="#0f172a">35.2%</text>
+    <text x="738" y="224" font-size="11" text-anchor="middle" fill="#475569">rolling capture</text>
+    <text x="738" y="303" font-size="12" font-weight="700" text-anchor="middle" fill="#0f766e">trailing-12m gate passed</text>
+    <text x="738" y="319" font-size="11" text-anchor="middle" fill="#64748b">17,520 settlement periods - 0 solver failures</text>
+  </g>
+
+  <line x1="54" y1="328" x2="866" y2="328" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="54" y="340" font-family="Arial, sans-serif" font-size="11" fill="#64748b">Caveats: wholesale proxy - price-taking EAC - BM excluded - CM scenario sidecar - not bankability - not a market index.</text>
 </svg>

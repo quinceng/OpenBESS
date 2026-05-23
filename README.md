@@ -18,7 +18,7 @@ The headline values below are the `v0.1.2` release evidence for the canonical
 trailing-12-month cache. The historical `v0.1.1` release note documents the
 earlier 90-day preview cache.
 
-![OpenBESS trailing-12-month headline evidence](docs/assets/openbess_trailing_12m_headline.svg)
+![OpenBESS trailing-12-month Stack Index evidence](docs/assets/openbess_trailing_12m_headline.svg)
 
 Use `results/dashboard/release_trailing_12m_historical` for the headline
 dashboard. The older `results/dashboard/release_90d_historical` cache is kept
