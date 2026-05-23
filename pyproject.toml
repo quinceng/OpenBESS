@@ -1,6 +1,6 @@
 [project]
 name = "gb-bess-revenue-stack"
-version = "0.1.1"
+version = "0.1.2"
 description = "Public-data GB BESS revenue-stack modelling and OpenBESS Stack Index preview."
 readme = "README.md"
 license = { file = "LICENSE" }

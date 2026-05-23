@@ -21,8 +21,8 @@ preview evidence.
 
 ## Release docs
 
-- `release_notes_v0.1.1.md`: latest tagged Release 1 patch note covering Phase 6 hardening.
-- `../CHANGELOG.md`: current mainline changes after the latest tag, including the trailing-12-month cache promotion.
+- `release_notes_v0.1.2.md`: latest tagged Release 1 patch note covering the trailing-12-month cache promotion.
+- `../CHANGELOG.md`: current release changes and follow-on unreleased notes.
 - `finance_boundaries.md`: finance scenario inclusions, exclusions and required caveat wording.
 - `known_limitations.md`: durable limitations that must stay visible in methodology, dashboard and README.
 - `reproducibility.md`: intended reproducibility workflow for a clean clone.

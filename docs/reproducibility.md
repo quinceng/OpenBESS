@@ -147,7 +147,7 @@ $env:GB_BESS_DASHBOARD_CACHE_DIR="results/dashboard/release_trailing_12m_histori
 uv run streamlit run dashboard/streamlit_app.py
 ```
 
-`GB_BESS_DASHBOARD_CACHE_DIR` was introduced post-v0.1.1 to select named
+`GB_BESS_DASHBOARD_CACHE_DIR` was introduced in v0.1.2 to select named
 dashboard caches. Without it, the dashboard reads `results/dashboard`, which is
 useful for the short network-free smoke cache.
 

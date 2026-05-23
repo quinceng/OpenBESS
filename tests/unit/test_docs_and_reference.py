@@ -87,7 +87,7 @@ def test_capacity_market_caveat_is_closed_as_reference_sidecar() -> None:
 def test_release_hardening_files_exist() -> None:
     assert (ROOT / "LICENSE").is_file()
     assert (ROOT / "CHANGELOG.md").is_file()
-    assert (ROOT / "docs/release_notes_v0.1.1.md").is_file()
+    assert (ROOT / "docs/release_notes_v0.1.2.md").is_file()
     assert (ROOT / "docs/phase_reviews/phase_6_review.md").is_file()
 
 
@@ -221,7 +221,7 @@ def test_release_docs_pin_preview_cache_and_trailing_12m_target() -> None:
         assert "GB_BESS_DASHBOARD_CACHE_DIR" in doc
 
     assert "canonical trailing-12-month dashboard cache" in readme
-    assert "current main-branch evidence generated after the\n`v0.1.1` tag" in readme
+    assert "`v0.1.2` release evidence for the canonical\ntrailing-12-month cache" in readme
     assert "long-running release job over live public APIs" in readme
     assert "90-day preview cache" in reproducibility
     assert "long-running release job" in reproducibility

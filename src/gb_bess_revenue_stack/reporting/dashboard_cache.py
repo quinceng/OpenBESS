@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 from datetime import UTC, date, datetime
 from math import ceil
 from pathlib import Path
@@ -45,6 +47,7 @@ CM_REFERENCE_SIDECAR_CAVEAT = (
     "Capacity Market value is a scenario/reference sidecar, not a central "
     "official storage-derating result."
 )
+CODE_VERSION_ENV_VAR = "GB_BESS_CODE_VERSION"
 
 
 class PublicBenchmarkAnchor(BaseModel):
@@ -167,6 +170,30 @@ def load_phase4_finance_assumptions(path: str | Path | None = None) -> Phase4Fin
     return Phase4FinanceAssumptions.model_validate(raw)
 
 
+def _default_code_version() -> str:
+    explicit = os.environ.get(CODE_VERSION_ENV_VAR)
+    if explicit:
+        return explicit
+
+    repo_root = Path(__file__).resolve().parents[3]
+    try:
+        completed = subprocess.run(
+            ["git", "describe", "--tags", "--always", "--dirty"],
+            check=False,
+            capture_output=True,
+            cwd=repo_root,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+
+    code_version = completed.stdout.strip()
+    if completed.returncode != 0 or not code_version:
+        return "unknown"
+    return code_version
+
+
 class Phase4DashboardCacheInput(BaseModel):
     """Inputs required to build dashboard-ready Phase 4 cache artefacts."""
 
@@ -180,7 +207,7 @@ class Phase4DashboardCacheInput(BaseModel):
     caveats: list[str]
     created_at_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
     schema_version: str = "0.1.0"
-    code_version: str = "unknown"
+    code_version: str = Field(default_factory=_default_code_version)
     config_hash: str
     source_snapshot_hash: str
     input_run_ids: list[str]

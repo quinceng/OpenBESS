@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from click import unstyle
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from gb_bess_revenue_stack.cli import _cm_sidecar_for_asset, _release_cache_skipped_stages, app
@@ -21,6 +22,15 @@ def command_help(*args: str) -> str:
 
     assert result.exit_code == 0
     return unstyle(result.output)
+
+
+def command_options(command_name: str) -> set[str]:
+    command = get_command(app).commands[command_name]
+    options: set[str] = set()
+    for param in command.params:
+        options.update(getattr(param, "opts", []))
+        options.update(getattr(param, "secondary_opts", []))
+    return options
 
 
 def test_cli_exposes_fetch_data_subcommand() -> None:
@@ -67,17 +77,17 @@ def test_cli_exposes_build_phase4_aligned_cache_subcommand() -> None:
 
 
 def test_cli_exposes_run_release_cache_subcommand() -> None:
-    output = command_help("run-release-cache")
+    options = command_options("run-release-cache")
 
-    assert "--aligned-cache-dir" in output
-    assert "--dashboard-dir" in output
-    assert "--asset-id" in output
-    assert "--cm-scenarios-yaml" in output
-    assert "--horizon-periods" in output
-    assert "--profile" in output
-    assert "--skip-smoke-windows" in output
-    assert "--skip-forecast-model-comparison" in output
-    assert "--target-window-label" in output
+    assert "--aligned-cache-dir" in options
+    assert "--dashboard-dir" in options
+    assert "--asset-id" in options
+    assert "--cm-scenarios-yaml" in options
+    assert "--horizon-periods" in options
+    assert "--profile" in options
+    assert "--skip-smoke-windows" in options
+    assert "--skip-forecast-model-comparison" in options
+    assert "--target-window-label" in options
 
 
 def test_release_cache_trailing12m_profile_skips_supplementary_stages() -> None:

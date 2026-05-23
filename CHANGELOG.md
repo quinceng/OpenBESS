@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-05-23
+
 - Promoted the canonical `openbess_canonical_1mw_2mwh` dashboard cache to the
   trailing-12-month window after the manifest passed the preferred coverage
   gate.
@@ -16,6 +18,10 @@
   implementation plans ignored.
 - Reconciled verified Elexon MID and NESO EAC source assumptions in the
   assumptions ledger.
+- Made release dashboard cache manifests record a Git-derived `code_version` by
+  default, with `GB_BESS_CODE_VERSION` available for explicit release stamping.
+- Hardened the release-cache CLI option exposure test against Rich/Typer help
+  rendering differences in headless GitHub Actions runs.
 
 ## 0.1.1 - 2026-05-21
 

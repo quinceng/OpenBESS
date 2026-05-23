@@ -14,9 +14,9 @@ runs without live network calls. It is not trading software, investment advice,
 a bankability model, an official market index or a proprietary benchmark
 replication.
 
-The headline values below are current main-branch evidence generated after the
-`v0.1.1` tag. The latest tagged release note still documents the earlier 90-day
-preview cache; `CHANGELOG.md` records this post-tag trailing-12-month promotion.
+The headline values below are the `v0.1.2` release evidence for the canonical
+trailing-12-month cache. The historical `v0.1.1` release note documents the
+earlier 90-day preview cache.
 
 ![OpenBESS trailing-12-month headline evidence](docs/assets/openbess_trailing_12m_headline.svg)
 
@@ -208,7 +208,7 @@ $env:GB_BESS_DASHBOARD_CACHE_DIR="results/dashboard/release_trailing_12m_histori
 uv run streamlit run dashboard/streamlit_app.py
 ```
 
-`GB_BESS_DASHBOARD_CACHE_DIR` was introduced post-v0.1.1 to select named
+`GB_BESS_DASHBOARD_CACHE_DIR` was introduced in v0.1.2 to select named
 dashboard caches. Without it, the dashboard reads
 `results/dashboard`, which remains useful for the short network-free smoke
 cache.
@@ -253,9 +253,9 @@ uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 ## Where To Read Next
 
 Start with `docs/openbess_stack_index.md` for the public index methodology.
-The latest tagged release note is `docs/release_notes_v0.1.1.md`.
-`CHANGELOG.md` records current post-v0.1.1 mainline hardening, including the
-trailing-12-month promotion.
+The latest tagged release note is `docs/release_notes_v0.1.2.md`.
+`CHANGELOG.md` records current release changes, including the trailing-12-month
+promotion.
 
 Read `docs/methodology.md` for the model equations and known time policy.
 

@@ -92,6 +92,18 @@ def test_phase5_dashboard_cache_writes_degradation_finance_and_benchmark_files(
     assert "partial_sample_annualised" not in manifest["licence_caveat_flags"]
 
 
+def test_phase6_cache_manifest_records_code_version_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GB_BESS_CODE_VERSION", "release-test-version")
+
+    write_phase4_dashboard_cache(_phase5_payload(), tmp_path)
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["code_version"] == "release-test-version"
+
+
 def test_phase5_cache_labels_finance_as_scenario_appraisal_not_bankability(
     tmp_path: Path,
 ) -> None:
