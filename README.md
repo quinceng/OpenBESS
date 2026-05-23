@@ -14,54 +14,8 @@ runs without live network calls. It is not trading software, investment advice,
 a bankability model, an official market index or a proprietary benchmark
 replication.
 
-The headline values below are the `v0.1.2` release evidence for the canonical
-trailing-12-month cache. The historical `v0.1.1` release note documents the
-earlier 90-day preview cache.
-
-![OpenBESS trailing-12-month Stack Index evidence](docs/assets/openbess_trailing_12m_headline.svg)
-
-Use `results/dashboard/release_trailing_12m_historical` for the headline
-dashboard. The older `results/dashboard/release_90d_historical` cache is kept
-only as historical preview evidence for comparison.
-
-## Key Results
-
-The current mainline evidence cache uses the canonical
-`openbess_canonical_1mw_2mwh` reference asset over the trailing-12-month
-historical window from `2025-05-20T00:00:00Z` to `2026-05-20T00:00:00Z`.
-
-| Result | Value |
-| --- | ---: |
-| Perfect-foresight upper-bound value | GBP 49,438.74 |
-| Previous-day rolling policy value | GBP 17,402.24 |
-| Previous-day capture ratio | 35.20% |
-| Degradation-adjusted rolling value | GBP 12,053.15 |
-| Capacity Market annual sidecar [1] | GBP 12,564.00/MW-year |
-| Solver failures | 0 |
-| Trailing-12-month target coverage | 100.00% |
-
-Note [1]: Annual scenario sidecar; not settlement-period dispatch revenue.
-
-These numbers are release evidence, not a bankability or investment claim. The
-cache passes the preferred `trailing_12m` coverage gate for the reference asset,
-but it still carries the project caveats: wholesale proxy, price-taking EAC,
-Balancing Mechanism exclusion, Capacity Market scenario sidecar and
-`not_a_market_index`. In plain English, `not_a_market_index` means these are
-modelled research outputs, not an official or independently administered market
-benchmark.
-
-Audit the headline numbers against the generated cache files at
-`results/dashboard/release_trailing_12m_historical/manifest.json` and
-`results/runs/release_cache_trailing_12m_historical/summary.json`. The
-release cache run ID is
-`release_cache_elexon_mid_neso_eac_2025_05_20_0000_2026_05_20_0000_utc`.
-The rolling-policy manifest uses 48 half-hour settlement periods per daily run,
-365 daily runs, and a previous-day same-period forecast, meaning the forecast is
-the prior day's price for the same settlement period.
-Do not compare the 90-day and trailing-12-month capture ratios as simple scale
-factors. They cover different historical months and price-shape mixes, so both
-the perfect-foresight upper bound and rolling-policy value change with the
-sample.
+Release evidence and generated outputs live in the release notes and
+reproducibility docs, not in this README.
 
 ## What The Model Does
 
@@ -81,11 +35,8 @@ known_at_utc <= decision_time_utc
 ```
 
 The rolling policy evidence is intentionally auditable rather than commercial.
-The canonical full-year cache uses the previous-day same-period baseline. The
-side-by-side previous-day versus trailing seven-day mean diagnostic remains in
-the historical 90-day preview and Phase 6 evidence so the effect of forecast
-choice stays visible without recomputing every supplementary diagnostic in the
-full-year release job.
+Release notes and methodology docs describe the forecast baselines and
+supplementary diagnostics for each published cache.
 
 ## OpenBESS Stack Index
 
@@ -175,74 +126,18 @@ These commands run the main network-free examples.
 uv run gb-bess run-smoke
 uv run gb-bess run-rolling-smoke
 uv run gb-bess run-market-stack-smoke
-uv run gb-bess run-phase4-smoke --finance-assumptions-yaml configs/finance_assumptions.yaml
-uv run gb-bess build-phase4-aligned-cache --days 7 --output-dir results/runs/release_cache/aligned_sources
-uv run gb-bess run-release-cache --aligned-cache-dir results/runs/release_cache/aligned_sources
-uv run gb-bess build-stack-series --cache-dir results/dashboard --output-dir results/dashboard
 uv run gb-bess run-residential-scenario-sweep
+```
+
+## Dashboard
+
+Optional local viewer for cached outputs:
+
+```bash
 uv run streamlit run dashboard/streamlit_app.py
 ```
 
-## Run The Canonical Dashboard
-
-The canonical trailing-12-month dashboard cache is generated under:
-
-```text
-results/dashboard/release_trailing_12m_historical
-```
-
-That cache is not committed because `results/` is ignored. A public clone must
-either rebuild it as a long-running release job over live public APIs or restore
-it from a separately published artefact. After rebuilding or restoring that
-cache locally from the current checkout, run the dashboard against it explicitly:
-
-```bash
-GB_BESS_DASHBOARD_CACHE_DIR=results/dashboard/release_trailing_12m_historical \
-  uv run streamlit run dashboard/streamlit_app.py
-```
-
-In PowerShell:
-
-```powershell
-$env:GB_BESS_DASHBOARD_CACHE_DIR="results/dashboard/release_trailing_12m_historical"
-uv run streamlit run dashboard/streamlit_app.py
-```
-
-`GB_BESS_DASHBOARD_CACHE_DIR` was introduced in v0.1.2 to select named
-dashboard caches. Without it, the dashboard reads
-`results/dashboard`, which remains useful for the short network-free smoke
-cache.
-
-If you only want the short network-free demo cache, use:
-
-```bash
-uv run gb-bess run-phase4-smoke --finance-assumptions-yaml configs/finance_assumptions.yaml
-uv run streamlit run dashboard/streamlit_app.py
-```
-
-To rebuild the canonical trailing-12-month cache from aligned public sources:
-
-```bash
-uv run gb-bess build-phase4-aligned-cache \
-  --start 2025-05-20T00:00:00Z \
-  --days 365 \
-  --output-dir results/runs/release_cache_trailing_12m_historical/aligned_sources
-
-uv run gb-bess run-release-cache \
-  --aligned-cache-dir results/runs/release_cache_trailing_12m_historical/aligned_sources \
-  --output-dir results/runs/release_cache_trailing_12m_historical \
-  --dashboard-dir results/dashboard/release_trailing_12m_historical \
-  --profile trailing12m \
-  --target-window-label trailing_12m
-```
-
-The historical `v0.1.1` 90-day preview cache remains useful for auditing the
-previous release gate. That preview carries `below_trailing_12m_coverage`
-because it does not cover the preferred full-year window:
-
-```text
-results/dashboard/release_90d_historical
-```
+For cache rebuilds or selecting named caches, see `docs/reproducibility.md`.
 
 To fetch a small public NESO EAC sample, run this command.
 
@@ -254,8 +149,7 @@ uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 
 Start with `docs/openbess_stack_index.md` for the public index methodology.
 The latest tagged release note is `docs/release_notes_v0.1.2.md`.
-`CHANGELOG.md` records current release changes, including the trailing-12-month
-promotion.
+`CHANGELOG.md` records current release changes.
 
 Read `docs/methodology.md` for the model equations and known time policy.
 

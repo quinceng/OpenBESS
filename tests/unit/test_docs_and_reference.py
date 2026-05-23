@@ -214,15 +214,25 @@ def test_release_docs_pin_preview_cache_and_trailing_12m_target() -> None:
     quality_gates = (ROOT / "docs/quality_gates.md").read_text(encoding="utf-8")
     release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
 
-    for doc in [readme, reproducibility]:
-        assert "results/dashboard/release_90d_historical" in doc
-        assert "results/dashboard/release_trailing_12m_historical" in doc
-        assert "below_trailing_12m_coverage" in doc
-        assert "GB_BESS_DASHBOARD_CACHE_DIR" in doc
+    for phrase in [
+        "results/dashboard/release_90d_historical",
+        "results/dashboard/release_trailing_12m_historical",
+        "below_trailing_12m_coverage",
+        "GB_BESS_DASHBOARD_CACHE_DIR",
+    ]:
+        assert phrase in reproducibility
 
-    assert "canonical trailing-12-month dashboard cache" in readme
-    assert "`v0.1.2` release evidence for the canonical\ntrailing-12-month cache" in readme
-    assert "long-running release job over live public APIs" in readme
+    readme_release_pointer = (
+        "Release evidence and generated outputs live in the release notes and\nreproducibility docs"
+    )
+    assert readme_release_pointer in readme
+    assert "Optional local viewer for cached outputs" in readme
+    assert "For cache rebuilds or selecting named caches" in readme
+    assert "## Key Results" not in readme
+    assert "openbess_trailing_12m_headline.svg" not in readme
+    assert "GBP 49,438.74" not in readme
+    assert "release_cache" not in readme
+    assert "trailing-12-month" not in readme
     assert "90-day preview cache" in reproducibility
     assert "long-running release job" in reproducibility
     assert "--profile trailing12m" in reproducibility
