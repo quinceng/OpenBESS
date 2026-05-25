@@ -8,7 +8,7 @@ It remains a public-data research artefact, not trading software, investment
 advice, a bankability model, an official market index or a proprietary
 benchmark replication.
 
-## Highlights
+## What changed
 
 - Promoted `openbess_canonical_1mw_2mwh` to the trailing-12-month historical
   window from `2025-05-20T00:00:00Z` to `2026-05-20T00:00:00Z`.

@@ -23,7 +23,7 @@
 - Added release-cache stage timing plus a `trailing12m` profile that skips
   supplementary diagnostics while preserving required gate outputs.
 - Polished the README release story with trailing-12-month headline evidence,
-  key results and the canonical dashboard cache command.
+  main results and the canonical dashboard cache command.
 - Added dashboard cache directory selection via `GB_BESS_DASHBOARD_CACHE_DIR`.
 - Kept 90-day canonical-asset runs labelled as `OpenBESS Reference Revenue Stack Preview`
   until the `trailing_12m` target-window gate passes.

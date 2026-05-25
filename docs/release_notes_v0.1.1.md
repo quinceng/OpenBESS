@@ -6,7 +6,7 @@ OpenBESS v0.1.1 is a Release 1 patch that hardens the public dashboard cache,
 forecast-policy diagnostics and reproducibility notes after the initial v0.1.0
 tag.
 
-## Highlights
+## What changed
 
 - Rebuilt the canonical OpenBESS dashboard cache over the 90-day historical
   Elexon MID and NESO EAC window from 2026-02-01 to 2026-05-02 UTC.

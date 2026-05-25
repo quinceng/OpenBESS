@@ -77,7 +77,7 @@ Required Phase 1 checks:
 - verify publication or conservative known-at policy;
 - verify whether volume fields can support optional procurement-cap sensitivity.
 
-Central EAC products should be the smallest verified set. If only one product is robustly verified, Release 1 should use one product rather than overclaim a full service suite.
+Central EAC products should be the smallest verified set. If only one product is verified well enough, Release 1 should use one product rather than overclaim a full service suite.
 
 Known-time maintenance rule:
 

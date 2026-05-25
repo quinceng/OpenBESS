@@ -6,7 +6,7 @@ OpenBESS v0.1.0 is the first public research release. It packages the core GB
 BESS modelling workflow, the OpenBESS Reference Revenue Stack preview, cached dashboard
 artefacts, and reproducible checks.
 
-## Highlights
+## What changed
 
 - Added aligned Elexon MID and NESO EAC release-cache commands.
 - Added OpenBESS Reference Revenue Stack CSV and parquet artefacts with coverage gates.

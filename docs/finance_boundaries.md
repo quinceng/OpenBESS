@@ -44,7 +44,7 @@ advice, bankability analysis or a substitute for commercial due diligence.
 - merchant risk premium;
 - asset-specific commercial contracts.
 
-The dashboard should show these exclusions near NPV outputs, not only in the methodology.
+The dashboard should show these exclusions near NPV outputs, rather than only in the methodology.
 
 ## 4. Cash-Flow Schema
 
