@@ -458,7 +458,7 @@ def run_release_cache(
     ] = Path("configs/reference_assets.yaml"),
     asset_id: Annotated[
         str,
-        typer.Option(help="Reference asset id for the OpenBESS Stack Index run."),
+        typer.Option(help="Reference asset id for the OpenBESS Reference Revenue Stack run."),
     ] = OPENBESS_CANONICAL_ASSET_ID,
     finance_assumptions_yaml: Annotated[
         Path | None,
@@ -506,7 +506,7 @@ def run_release_cache(
         typer.Option(help="Preferred coverage window for public release metadata."),
     ] = "trailing_12m",
 ) -> None:
-    """Run a longer cached OpenBESS Stack Index release preview."""
+    """Run a longer cached OpenBESS Reference Revenue Stack release preview."""
 
     if days <= 0:
         raise typer.BadParameter("days must be positive.")
@@ -1051,10 +1051,10 @@ def build_stack_series(
     ] = Path("results/dashboard"),
     output_dir: Annotated[
         Path,
-        typer.Option(help="Directory for OpenBESS Stack Index CSV/parquet exports."),
+        typer.Option(help="Directory for OpenBESS Reference Revenue Stack CSV/parquet exports."),
     ] = Path("results/dashboard"),
 ) -> None:
-    """Build OpenBESS Stack Index exports from cached stack-series rows."""
+    """Build OpenBESS Reference Revenue Stack exports from cached stack-series rows."""
 
     import pandas as pd
 
@@ -1066,7 +1066,7 @@ def build_stack_series(
     rows = _validate_stack_series_records(frame.to_dict(orient="records"))
     paths = write_stack_series(rows, output_dir)
     typer.echo(
-        "Built OpenBESS Stack Index exports: "
+        "Built OpenBESS Reference Revenue Stack exports: "
         f"rows={len(rows)}, parquet={paths['parquet']}, csv={paths['csv']}"
     )
 

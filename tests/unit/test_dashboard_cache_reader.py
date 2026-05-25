@@ -141,7 +141,7 @@ def test_dashboard_view_model_exposes_phase4_sections(tmp_path: Path) -> None:
     assert model["has_data_quality"] is True
     assert model["has_stack_series"] is True
     assert model["has_finance_sensitivities"] is True
-    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["display_label"] == "OpenBESS Reference Revenue Stack Preview"
     assert model["stack_index"]["primary_window_label"] == "7d"
     assert model["stack_index"]["target_window_label"] == "7d"
     assert model["stack_index"]["primary_coverage_pct"] == pytest.approx(1.0)
@@ -173,7 +173,7 @@ def test_dashboard_view_model_keeps_90d_target_shortfall_labelled_preview(
 
     model = build_view_model(load_dashboard_cache(tmp_path))
 
-    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["display_label"] == "OpenBESS Reference Revenue Stack Preview"
     assert model["stack_index"]["primary_window_label"] == "90d"
     assert model["stack_index"]["target_window_label"] == "trailing_12m"
     assert "below_trailing_12m_coverage" in model["stack_index"]["caveat_flags"]
@@ -201,7 +201,7 @@ def test_dashboard_view_model_keeps_legacy_90d_metadata_labelled_preview(
 
     model = build_view_model(load_dashboard_cache(tmp_path))
 
-    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["display_label"] == "OpenBESS Reference Revenue Stack Preview"
     assert model["stack_index"]["primary_window_label"] == "90d"
     assert model["stack_index"]["target_window_label"] == "90d"
 
@@ -226,7 +226,7 @@ def test_dashboard_view_model_promotes_eligible_trailing_12m_to_full_label(
 
     model = build_view_model(load_dashboard_cache(tmp_path))
 
-    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index"
+    assert model["stack_index"]["display_label"] == "OpenBESS Reference Revenue Stack"
     assert model["stack_index"]["primary_window_label"] == "trailing_12m"
 
 
@@ -247,7 +247,7 @@ def test_dashboard_view_model_requires_explicit_trailing_12m_target_eligibility(
 
     model = build_view_model(load_dashboard_cache(tmp_path))
 
-    assert model["stack_index"]["display_label"] == "OpenBESS Stack Index Preview"
+    assert model["stack_index"]["display_label"] == "OpenBESS Reference Revenue Stack Preview"
     assert model["stack_index"]["primary_window_label"] == "trailing_12m"
 
 

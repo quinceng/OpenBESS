@@ -23,7 +23,7 @@ This project does not:
 - prove bankable returns;
 - provide investment advice.
 
-Named OpenBESS outputs, including the OpenBESS Stack Index, must carry
+Named OpenBESS outputs, including the OpenBESS Reference Revenue Stack, must carry
 `not_a_market_index`. They are not official market indices, proprietary-model
 replications or bankable revenue assessments.
 
@@ -69,7 +69,9 @@ Central treatment:
 - reserve headroom/footroom;
 - reserve energy feasibility;
 - verified block/commitment rules where public sources support them;
-- missing-data classification.
+- missing-data classification;
+- conservative known-time policy until product-specific publication, gate and
+  result-release timing are verified.
 
 Excluded centrally:
 
@@ -81,7 +83,7 @@ Excluded centrally:
 - activation energy settlement unless separately sourced;
 - BM revenue.
 
-BR, QR and SR products are source-gated. They may be included only if product definitions, directions, service windows and units are verified.
+BR, QR and SR products are source-gated. They may be included only if product definitions, directions, service windows and units are verified. At least one central EAC product should receive verified known-time evidence before stronger EAC contribution claims are made.
 
 ## 6. Capacity Market Boundary
 
@@ -105,13 +107,19 @@ No-derating CM revenue is a diagnostic only and must never be a central case.
 
 Central Release 1 excludes deterministic BM counterfactual revenue.
 
-Optional observed-BM appendix may:
+Observed-BM work is deferred future research rather than a Release 1 central
+appendix. It may proceed only if it remains separate from central revenue and
+includes:
 
 - reconstruct public observed actions for real units;
 - explain BOA/BOD/PN/FPN mechanics;
-- show why counterfactual acceptance is not inferable from public data alone.
+- show why counterfactual acceptance is not inferable from public data alone;
+- build an observed replay dataset;
+- fit or justify an acceptance-probability or bid-stack model;
+- report uncertainty bands and out-of-sample validation.
 
-Optional observed-BM appendix must not feed the central optimiser revenue stack.
+BM outputs must not feed the central optimiser revenue stack, finance headline
+or OpenBESS Reference Revenue Stack until empirical validation supports the extension.
 
 ## 8. Forecast and Policy Boundary
 

@@ -52,6 +52,7 @@ sources:
     name: NESO Enduring Auction Capability auction results
     owner: NESO
     status: verified
+    verified_as_of: 2026-05-24
     intended_use:
       - eac_availability_prices
       - eac_product_coverage
@@ -64,9 +65,11 @@ sources:
       selected_resource:
         name: NESO Response-Reserve Results Summary
         resource_id: 596f29ac-0387-4ba4-a6d3-95c243140707
+        verified_as_of: 2026-05-24
       supplementary_resource:
         name: NESO Response-Reserve Results By Unit
         resource_id: a63ab354-7e68-44c2-ad96-c6f920c30e85
+        verified_as_of: 2026-05-24
     verified_fields:
       - auctionID
       - auctionProduct
@@ -93,6 +96,20 @@ sources:
       - PQR
       - PSR
     known_at_policy: delivery_start_utc_conservative_until_publication_time_verified
+    known_at_policy_note: >
+      Central rolling EAC policy remains conservative until product-specific
+      auction publication time, gate closure and result-release timing are
+      verified. Stronger contribution claims require at least one central EAC
+      product to have verified known-time evidence.
+    schema_drift_notes:
+      - >
+        Resource IDs, field names, product labels and timestamp conventions were
+        treated as verified for this maintenance pass on 2026-05-24. Re-check
+        CKAN package/resource metadata before each public release cache rebuild.
+      - >
+        If fields are added, renamed or unit metadata changes, quarantine the
+        affected records, bump the processed schema version and update fixtures
+        before central EAC runs are regenerated.
     phase1_decision: verified_for_price_taking_availability_pipeline_with_publication_time_caveat
 
   - source_id: NESO_EAC_MARKET_RULES
@@ -226,15 +243,19 @@ sources:
   - source_id: ELEXON_BM_OBSERVED_OPTIONAL
     name: Public Balancing Mechanism observed action data
     owner: Elexon
-    status: optional
+    status: deferred_future_research
     intended_use:
-      - observed_bm_appendix
+      - observed_bm_replay_research
+      - bm_acceptance_probability_extension
     access:
       type: api_or_download
-      url: phase5_verify_if_scoped
+      url: TBD_explicit_future_scope_required_before_use
     caveat: >
-      Observed BM data may be used only for an ex-post appendix. It must not
-      create deterministic counterfactual revenue for the reference asset.
+      Observed BM data is deferred from central Release 1. Future use requires
+      observed BM replay for real units, an empirically validated acceptance
+      probability or bid-stack model, uncertainty bands around any counterfactual
+      estimate and an explicit rule preventing central revenue use until the
+      model is validated out of sample.
 
   - source_id: PROJECT_CONVENTION
     name: Project modelling convention

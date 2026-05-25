@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360" role="img" aria-labelledby="title desc">
-  <title id="title">OpenBESS trailing-12-month Stack Index evidence</title>
+  <title id="title">OpenBESS trailing-12-month Reference Revenue Stack evidence</title>
   <desc id="desc">OpenBESS v0.1.2 release evidence for the canonical trailing-12-month cache. Rolling policy value is GBP 17,402, degradation-adjusted rolling value is GBP 12,053, perfect-foresight upper-bound value is GBP 49,439, rolling capture is 35.2 percent, the trailing-12-month gate passed with 17,520 settlement periods and zero solver failures.</desc>
 
   <defs>
@@ -10,7 +10,7 @@
 
   <rect x="24" y="24" width="872" height="320" rx="10" fill="#ffffff" stroke="#e2e8f0" filter="url(#cardShadow)"/>
 
-  <text x="54" y="64" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">OpenBESS Stack Index</text>
+  <text x="54" y="64" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">OpenBESS Reference Revenue Stack</text>
   <text x="54" y="90" font-family="Arial, sans-serif" font-size="13" fill="#475569">Trailing-12m cache - 2025-05-20 to 2026-05-20 UTC - openbess_canonical_1mw_2mwh</text>
   <text x="866" y="64" font-family="Arial, sans-serif" font-size="12" font-weight="700" text-anchor="end" fill="#0f766e">v0.1.2 release evidence</text>
 

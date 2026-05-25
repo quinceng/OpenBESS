@@ -116,7 +116,7 @@ decision step, service label and direction. `data_quality.json` records source
 IDs, known-at policy, solver failure count, excluded future rows and service
 cell coverage.
 
-`stack_series.parquet` and `stack_series.csv` record the OpenBESS Stack Index
+`stack_series.parquet` and `stack_series.csv` record the OpenBESS Reference Revenue Stack
 Preview series from the same dataframe. The CSV export serialises
 `caveat_flags` as JSON text. Both exports contain row-level stack values and
 must preserve `not_a_market_index`.
@@ -175,11 +175,11 @@ The dashboard label is gated by those fields:
 - `target_window_eligible` is a boolean that must be `true` before the target is
   considered met.
 
-The dashboard may use the full `OpenBESS Stack Index` label only when the
+The dashboard may use the full `OpenBESS Reference Revenue Stack` label only when the
 primary window is `trailing_12m`, the target is eligible and
 `below_trailing_12m_coverage` is absent. A 90-day cache, including older
 manifests without target-window metadata, must remain labelled
-`OpenBESS Stack Index Preview`.
+`OpenBESS Reference Revenue Stack Preview`.
 
 For a trailing-12-month gate run, the required stages are central rolling policy,
 perfect-foresight capture comparison, stack-series window eligibility,
@@ -249,8 +249,8 @@ Scheduled refresh is out of scope until source clients, licences and runtime bud
 
 Use `uv run gb-bess build-phase4-aligned-cache` to fetch aligned Elexon MID and
 NESO EAC source JSON for a requested window. The default is a seven-day release
-preview. Use `uv run gb-bess run-release-cache` to run the cached OpenBESS Stack
-Index preview and write the dashboard artefacts.
+preview. Use `uv run gb-bess run-release-cache` to run the cached OpenBESS
+Reference Revenue Stack preview and write the dashboard artefacts.
 
 ## 9. Tests
 

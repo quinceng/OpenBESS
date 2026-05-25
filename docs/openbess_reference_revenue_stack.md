@@ -1,13 +1,18 @@
-# OpenBESS Stack Index
+# OpenBESS Reference Revenue Stack
 
-The OpenBESS Stack Index is a public-data educational series for a reference GB
+The OpenBESS Reference Revenue Stack is a public-data educational series for a reference GB
 battery energy storage asset. It is not an official market index and not investment advice.
 It is not a proprietary benchmark replication and not a bankable revenue forecast.
 
-The public-facing name is OpenBESS Stack Index, but every named output must
+The label is a provenance and coverage label for reproducible cache artefacts,
+not evidence of a durable market benchmark unless explicit empirical-validation
+gates for repeated windows, seasonal/monthly breakdowns and outlier diagnostics
+are satisfied in public release evidence.
+
+The public-facing name is OpenBESS Reference Revenue Stack, but every named output must
 carry `not_a_market_index` until and unless a future governance process creates
 an independently maintained index. Short-window outputs should be labelled
-`OpenBESS Stack Index Preview` unless the coverage gates below pass.
+`OpenBESS Reference Revenue Stack Preview` unless the coverage gates below pass.
 
 ## Reference Assets
 
@@ -26,7 +31,7 @@ runs, not for every smoke run or commercial fixture.
 
 ## Stack Sequence
 
-The OpenBESS Stack Index sequence is:
+The OpenBESS Reference Revenue Stack sequence is:
 
 1. Elexon BMRS MID wholesale proxy.
 2. NESO EAC price-taking availability proxy.
@@ -87,7 +92,7 @@ diagnostic samples but should not be annualised as public headline values.
 Annualised finance and benchmark model fields are suppressed/null until coverage gates pass.
 Trailing 12m is the preferred public window. The canonical
 `release_trailing_12m_historical` cache now passes that preferred gate and may
-use the full OpenBESS Stack Index label only when its manifest records
+use the full OpenBESS Reference Revenue Stack label only when its manifest records
 `primary_window_label=trailing_12m`, `target_window_eligible=true` and no
 `below_trailing_12m_coverage` caveat.
 
@@ -131,7 +136,7 @@ commercial forecasting performance.
 
 ## Non-Claims
 
-OpenBESS Stack Index outputs do not claim to:
+OpenBESS Reference Revenue Stack outputs do not claim to:
 
 - be an official market index;
 - be investment advice;

@@ -79,6 +79,15 @@ Required Phase 1 checks:
 
 Central EAC products should be the smallest verified set. If only one product is robustly verified, Release 1 should use one product rather than overclaim a full service suite.
 
+Known-time maintenance rule:
+
+- central rolling EAC policy remains conservative until product-specific
+  publication time, auction gate timing and result-release timing are verified;
+- at least one central EAC product should be prioritised for verified
+  known-time evidence before making stronger EAC contribution or capture claims;
+- if product-specific evidence is unavailable, EAC rolling outputs must state the
+  conservative known-at policy used and avoid implying pre-auction tradability.
+
 Longer release caches use an aligned Elexon and NESO delivery window. Elexon
 MID rows are filtered to one provider and to settlement starts inside the
 requested interval. NESO EAC rows are queried by delivery-window overlap and
@@ -155,23 +164,30 @@ Rules:
 - anchors are not test targets;
 - anchors must not be used as forecast inputs unless available at the decision time and explicitly justified.
 
-## 7. Optional Observed BM
+## 7. Deferred BM Future Research
 
-Intended source:
+Potential future source:
 
 ```text
 ELEXON_BM_OBSERVED_OPTIONAL
 ```
 
-Purpose:
+Release 1 rule:
 
-- optional ex-post appendix;
-- demonstrate BM literacy;
-- explain counterfactual limitation.
+- no deterministic BM counterfactual revenue in the central optimiser;
+- no BM revenue in central results, finance outputs or headline stack series;
+- public benchmark differences caused by BM are explained as a boundary, not
+  filled with unsupported counterfactuals.
 
-Kill rule:
+Future research requirements before any BM revenue extension:
 
-If observed BM takes more than a small appendix effort, defer it. It must not delay Release 1.
+- observed BM replay for real units using public BOA/BOD/PN/FPN-style evidence;
+- acceptance-probability or bid-stack model with documented feature set and
+  source coverage;
+- out-of-sample validation against observed acceptances;
+- uncertainty bands around any counterfactual revenue estimate;
+- explicit separation from central Release 1 revenue until empirically
+  validated.
 
 ## 8. Raw and Processed Data
 

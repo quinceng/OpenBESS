@@ -315,9 +315,9 @@ def _stack_index_view(cache: DashboardCache) -> dict[str, Any]:
         and metadata.get("target_window_eligible") is True
     )
     return {
-        "display_label": "OpenBESS Stack Index Preview"
+        "display_label": "OpenBESS Reference Revenue Stack Preview"
         if not trailing_12m_complete
-        else "OpenBESS Stack Index",
+        else "OpenBESS Reference Revenue Stack",
         "primary_window_label": primary_window_label,
         "target_window_label": target_window_label,
         "primary_coverage_pct": primary_window.get("coverage_pct"),

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Renamed public release-series wording to OpenBESS Reference Revenue Stack while
+  preserving `not_a_market_index` caveats.
+- Added a falsifiable research question, literature-context map and
+  empirical/statistical validation gates for rolling-window confidence intervals,
+  seasonal/monthly breakdowns and multi-year caches.
+- Hardened NESO EAC source-drift and known-time caveats with `verified_as_of`
+  metadata.
+- Deferred BM counterfactual revenue from Release 1 and reframed future work
+  around observed replay, acceptance-probability or bid-stack modelling,
+  uncertainty bands and out-of-sample validation.
+- Reframed follow-on scope around BM acceptance and forecast validation before
+  optional stochastic diagnostics.
+
 ## 0.1.2 - 2026-05-23
 
 - Promoted the canonical `openbess_canonical_1mw_2mwh` dashboard cache to the
@@ -12,7 +25,7 @@
 - Polished the README release story with trailing-12-month headline evidence,
   key results and the canonical dashboard cache command.
 - Added dashboard cache directory selection via `GB_BESS_DASHBOARD_CACHE_DIR`.
-- Kept 90-day canonical-asset runs labelled as `OpenBESS Stack Index Preview`
+- Kept 90-day canonical-asset runs labelled as `OpenBESS Reference Revenue Stack Preview`
   until the `trailing_12m` target-window gate passes.
 - Promoted stable phase/process evidence docs while keeping detailed local
   implementation plans ignored.
@@ -31,7 +44,7 @@
 
 ## 0.1.0 - 2026-05-20
 
-- Added OpenBESS Stack Index preview artefacts, reference asset presets and public methodology documentation.
+- Added OpenBESS Reference Revenue Stack preview artefacts, reference asset presets and public methodology documentation.
 - Added Phase 4 historical Elexon/NESO smoke fixtures and cache-backed dashboard artefacts.
 - Added Phase 5 degradation, finance scenario appraisal and benchmark reconciliation cache outputs.
 - Added residential payback, bill-aware dispatch smoke and named scenario sweep examples.

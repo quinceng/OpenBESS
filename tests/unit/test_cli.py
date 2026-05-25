@@ -137,7 +137,7 @@ def test_cli_exposes_run_residential_scenario_sweep_subcommand() -> None:
 def test_cli_exposes_build_stack_series_subcommand() -> None:
     output = command_help("build-stack-series")
 
-    assert "OpenBESS Stack Index" in output
+    assert "OpenBESS Reference Revenue Stack" in output
     assert "--cache-dir" in output
     assert "--output-dir" in output
 

@@ -44,6 +44,8 @@ Implication:
 - no strategic bidding;
 - no auction clearing;
 - no acceptance probability;
+- activation/utilisation energy settlement is excluded from the central EAC
+  availability case unless separately sourced and labelled as a sensitivity;
 - no guarantee that a real asset would receive the modelled commitments.
 
 ## 5. EAC Source and Timing Dependence
@@ -53,7 +55,10 @@ EAC product definitions, publication times and delivery windows must be verified
 Implication:
 
 - if known-time metadata is weak, rolling policy results need stronger caveats;
-- central product set should stay narrow.
+- central product set should stay narrow;
+- central known-time policy remains conservative until product-specific
+  publication and gate timing are verified, with at least one central product
+  prioritised for stronger evidence before stronger EAC contribution claims.
 
 ## 6. Balancing Mechanism Exclusion
 
@@ -62,7 +67,10 @@ Central Release 1 excludes deterministic BM counterfactual revenue.
 Implication:
 
 - outputs may be lower than benchmarks that include BM;
-- optional observed-BM appendix is ex-post only.
+- observed BM replay and acceptance-probability or bid-stack modelling are
+  deferred future research, not Release 1 central revenue;
+- no BM counterfactual revenue should be used centrally until empirical
+  validation and uncertainty bands are available.
 
 ## 7. Capacity Market Simplification
 

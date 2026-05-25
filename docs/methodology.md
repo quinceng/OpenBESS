@@ -3,12 +3,26 @@
 This document is the methodology contract for Release 1. During implementation it should evolve from a contract into the final methodology paper by adding source verification outcomes, result figures and run IDs.
 
 The public series methodology for named OpenBESS outputs is documented in
-[`openbess_stack_index.md`](openbess_stack_index.md). This document remains the
+[`openbess_reference_revenue_stack.md`](openbess_reference_revenue_stack.md). This document remains the
 detailed equations and implementation contract behind that public methodology.
 
 ## 1. Research Question
 
-The project estimates the revenue stack available to a reference GB BESS under transparent public-data assumptions. It compares perfect-foresight upper-bound dispatch with no-leakage rolling policies and explains divergence from public benchmark narratives.
+The project estimates the revenue stack available to a reference GB BESS under
+transparent public-data assumptions. The falsifiable research question is:
+
+```text
+How much perfect-foresight value is lost under auditable public-data rolling
+policies, and how much loss is attributable to forecast error versus
+market-boundary exclusions?
+```
+
+The README states the public research question and the contribution/non-claim
+split. Deeper research notes and literature mapping are local working material,
+not public repository artefacts.
+
+OpenBESS is an open public-data reference. It is not a trading system, not
+bankability analysis and not proprietary benchmark replication.
 
 ## 2. Scope
 
@@ -121,6 +135,11 @@ Regret:
 ```text
 regret = perfect_foresight_revenue - realised_rolling_revenue
 ```
+
+Contribution claims based on rolling-policy results require rolling-window
+confidence intervals, monthly and seasonal breakdowns, and multi-year caches
+before they are described as persistent market evidence rather than cache-level
+evidence.
 
 ## 7. Capacity Market
 

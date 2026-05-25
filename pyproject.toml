@@ -1,9 +1,11 @@
 [project]
 name = "gb-bess-revenue-stack"
 version = "0.1.2"
-description = "Public-data GB BESS revenue-stack modelling and OpenBESS Stack Index preview."
+description = "Public-data GB BESS revenue-stack modelling and OpenBESS Reference Revenue Stack preview."
 readme = "README.md"
 license = { file = "LICENSE" }
+authors = [{ name = "Quincy Ng", email = "203675009+quinceng@users.noreply.github.com" }]
+maintainers = [{ name = "Quincy Ng", email = "203675009+quinceng@users.noreply.github.com" }]
 requires-python = ">=3.11,<3.13"
 classifiers = [
   "License :: OSI Approved :: Apache Software License",

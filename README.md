@@ -17,6 +17,10 @@ replication.
 Release evidence and generated outputs live in the release notes and
 reproducibility docs, not in this README.
 
+## Author
+
+OpenBESS is authored and maintained by Quincy Ng (`quinceng`).
+
 ## Contribution
 
 OpenBESS contributes an open, auditable baseline for analysing Great Britain
@@ -31,6 +35,22 @@ dispatch constraints and scenario comparison. Its purpose is to improve technica
 transparency and comparability; it is not a substitute for site-specific
 commercial due diligence, procurement advice, financing analysis or trading
 operations.
+
+## Research Question
+
+OpenBESS asks:
+
+```text
+How much perfect-foresight value is lost under auditable public-data rolling
+policies for a reference GB BESS, and how much of that loss is attributable to
+forecast error versus market-boundary exclusions?
+```
+
+The falsifiable quantity is the difference between public-boundary
+perfect-foresight revenue and realised public-data rolling-policy revenue. Each
+released cache should report that gap as both GBP and capture ratio. Claims about
+forecast error or market-boundary exclusions require explicit public diagnostics;
+otherwise those gaps remain labelled limitations rather than proven causes.
 
 ## What The Model Does
 
@@ -54,15 +74,18 @@ or decision-grade.
 Release notes and methodology docs describe the forecast baselines and
 supplementary diagnostics for each published cache.
 
-## OpenBESS Stack Index
+## OpenBESS Reference Revenue Stack
 
-The OpenBESS Stack Index is a reference view of Great Britain battery revenue
+The OpenBESS Reference Revenue Stack is a reference view of Great Britain battery revenue
 components computed from public-source cache files. It is published as an open
 methodology and reproducible artefact for technical comparison, not as an
 official market index, a tradable benchmark or a replication of any proprietary
 index.
 
-The index is intentionally cautious. Short data samples stay labelled as
+The label identifies the cache family and coverage gate that produced an
+artefact; it is not a claim of persistent multi-year market performance.
+
+The reference stack is intentionally cautious. Short data samples stay labelled as
 preview evidence. Annualised summary figures and public benchmark anchor
 comparisons remain caveated because they are scenario comparisons, not
 proprietary benchmark replication or bankability analysis.
@@ -92,8 +115,13 @@ building simple data applications. Cache backed means the dashboard reads saved
 files rather than calling live data sources or solving models when the page
 loads.
 
-It also includes residential battery examples, including household bill
-simulation, illustrative payback calculations, and named sensitivity runs.
+## Related Branch Modules
+
+The repository also contains residential and commercial branch modules. These
+are separate from the central OpenBESS reference asset story. Residential
+examples cover household bill simulation, illustrative payback calculations and
+named sensitivity runs; commercial examples cover site/export-limit assumptions
+and related scenario fixtures.
 
 ## Repository Layout
 
@@ -142,12 +170,17 @@ GB_BESS_RUN_INTEGRATION=1 uv run pytest -m integration
 
 ## Useful Commands
 
-These commands run the main network-free examples.
+These commands run the central network-free examples.
 
 ```bash
 uv run gb-bess run-smoke
 uv run gb-bess run-rolling-smoke
 uv run gb-bess run-market-stack-smoke
+```
+
+Related branch examples are also network-free.
+
+```bash
 uv run gb-bess run-residential-scenario-sweep
 ```
 
@@ -169,7 +202,7 @@ uv run gb-bess fetch-data --source NESO_EAC_AUCTION_RESULTS --limit 20
 
 ## Where To Read Next
 
-Start with `docs/openbess_stack_index.md` for the public index methodology.
+Start with `docs/openbess_reference_revenue_stack.md` for the public methodology.
 The latest tagged release note is `docs/release_notes_v0.1.2.md`.
 `CHANGELOG.md` records current release changes.
 

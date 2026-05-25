@@ -26,6 +26,20 @@ def test_source_registry_has_phase1_gate_decisions() -> None:
     assert "phase1_verify" not in yaml.safe_dump(sources["ELEXON_BMRS_MID"])
     assert "phase1_verify" not in yaml.safe_dump(sources["NESO_EAC_AUCTION_RESULTS"])
 
+    eac_source = sources["NESO_EAC_AUCTION_RESULTS"]
+    assert str(eac_source["verified_as_of"]) == "2026-05-24"
+    assert (
+        eac_source["known_at_policy"]
+        == "delivery_start_utc_conservative_until_publication_time_verified"
+    )
+    assert "schema_drift_notes" in eac_source
+
+    bm_source = sources["ELEXON_BM_OBSERVED_OPTIONAL"]
+    assert bm_source["status"] == "deferred_future_research"
+    assert bm_source["access"]["url"] == "TBD_explicit_future_scope_required_before_use"
+    assert "acceptance probability or bid-stack model" in bm_source["caveat"]
+    assert "out of sample" in bm_source["caveat"]
+
 
 def test_public_explanatory_docs_exist() -> None:
     for relative_path in [
@@ -33,11 +47,52 @@ def test_public_explanatory_docs_exist() -> None:
         "docs/README.md",
         "docs/methodology.md",
         "docs/model_boundaries.md",
-        "docs/openbess_stack_index.md",
+        "docs/openbess_reference_revenue_stack.md",
         "docs/reproducibility.md",
         "docs/known_limitations.md",
     ]:
         assert (ROOT / relative_path).exists()
+
+
+def test_readme_states_falsifiable_public_data_research_question() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme_flat = readme.replace("\n", " ")
+    methodology = (ROOT / "docs/methodology.md").read_text(encoding="utf-8")
+    docs_readme = (ROOT / "docs/README.md").read_text(encoding="utf-8")
+
+    for phrase in [
+        "perfect-foresight value is lost",
+        "auditable public-data rolling policies",
+        "forecast error versus market-boundary exclusions",
+        "public-boundary perfect-foresight revenue",
+        "capture ratio",
+        "labelled limitations rather than proven causes",
+    ]:
+        assert phrase in readme_flat
+
+    assert "## Research Question" in readme
+    assert "README states the public research question" in methodology
+    assert "research_question.md" not in methodology
+    assert "literature_context.md" not in methodology
+    assert "research_question.md" not in docs_readme
+    assert "literature_context.md" not in docs_readme
+    assert "Local-only docs" in docs_readme
+
+
+def test_bm_deferral_language_is_guarded() -> None:
+    known_limitations = (ROOT / "docs/known_limitations.md").read_text(encoding="utf-8")
+    model_boundaries = (ROOT / "docs/model_boundaries.md").read_text(encoding="utf-8")
+
+    for phrase in [
+        "Central Release 1 excludes deterministic BM counterfactual revenue.",
+        "acceptance-probability or bid-stack",
+        "deferred future research",
+        "uncertainty bands",
+    ]:
+        assert phrase in known_limitations
+        assert phrase in model_boundaries
+
+    assert "must not feed the central optimiser revenue stack" in model_boundaries
 
 
 def test_capacity_market_reference_scenarios_validate() -> None:
@@ -88,37 +143,34 @@ def test_release_hardening_files_exist() -> None:
     assert (ROOT / "LICENSE").is_file()
     assert (ROOT / "CHANGELOG.md").is_file()
     assert (ROOT / "docs/release_notes_v0.1.2.md").is_file()
-    assert (ROOT / "docs/phase_reviews/phase_6_review.md").is_file()
 
 
-def test_public_process_evidence_docs_exist() -> None:
-    for relative_path in [
-        "docs/product_plan.md",
+def test_internal_working_docs_are_kept_local_by_gitignore() -> None:
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    for pattern in [
+        "docs/product_plan*.md",
+        "docs/phase_*_plan.md",
+        "docs/phase_reviews/",
+        "docs/adr/",
+        "docs/research_question.md",
+        "docs/literature_context.md",
         "docs/quality_gates.md",
         "docs/release_checklist.md",
         "docs/source_research_notes.md",
         "docs/validation_memo.md",
-        "docs/phase_reviews/README.md",
-        "docs/phase_reviews/p1_00_source_feasibility.md",
-        "docs/phase_reviews/phase_1_review.md",
-        "docs/phase_reviews/phase_2_review.md",
-        "docs/phase_reviews/phase_2_5_review.md",
-        "docs/phase_reviews/phase_3_review.md",
-        "docs/phase_reviews/phase_4_review.md",
-        "docs/phase_reviews/phase_5_review.md",
-        "docs/phase_reviews/phase_6_review.md",
+        "docs/strategic_positioning.md",
     ]:
-        assert (ROOT / relative_path).is_file()
+        assert pattern in gitignore
 
 
-def test_phase6_review_records_trailing_12m_follow_up() -> None:
-    review = (ROOT / "docs/phase_reviews/phase_6_review.md").read_text(encoding="utf-8")
+def test_release_note_records_trailing_12m_follow_up() -> None:
+    release_note = (ROOT / "docs/release_notes_v0.1.2.md").read_text(encoding="utf-8")
 
-    assert "Post-Phase-6 Follow-Up" in review
-    assert "results/dashboard/release_trailing_12m_historical" in review
-    assert "target_window_eligible=true" in review
-    assert "results/dashboard/release_90d_historical" in review
-    assert "below_trailing_12m_coverage" in review
+    assert "trailing-12-month public evidence cache" in release_note
+    assert "results/dashboard/release_trailing_12m_historical" in release_note
+    assert "100% `trailing_12m` target-window coverage" in release_note
+    assert "results/dashboard/release_90d_historical" not in release_note
 
 
 def test_verified_source_assumptions_are_reconciled() -> None:
@@ -153,12 +205,12 @@ def test_release_version_docs_match_package_version() -> None:
     assert f"## {version} -" in changelog
 
 
-def test_openbess_stack_index_public_doc_records_required_boundary_language() -> None:
-    doc = (ROOT / "docs/openbess_stack_index.md").read_text(encoding="utf-8")
+def test_openbess_reference_revenue_stack_public_doc_records_required_boundary_language() -> None:
+    doc = (ROOT / "docs/openbess_reference_revenue_stack.md").read_text(encoding="utf-8")
 
     required_phrases = [
-        "OpenBESS Stack Index",
-        "OpenBESS Stack Index Preview",
+        "OpenBESS Reference Revenue Stack",
+        "OpenBESS Reference Revenue Stack Preview",
         "not an official market index",
         "not investment advice",
         "Elexon BMRS MID wholesale proxy",
@@ -190,12 +242,12 @@ def test_openbess_stack_index_public_doc_records_required_boundary_language() ->
         assert phrase in doc
 
 
-def test_openbess_stack_index_is_referenced_by_boundary_docs() -> None:
+def test_openbess_reference_revenue_stack_is_referenced_by_boundary_docs() -> None:
     methodology = (ROOT / "docs/methodology.md").read_text(encoding="utf-8")
     model_boundaries = (ROOT / "docs/model_boundaries.md").read_text(encoding="utf-8")
     cache_contract = (ROOT / "docs/dashboard_cache_contract.md").read_text(encoding="utf-8")
 
-    assert "openbess_stack_index.md" in methodology
+    assert "openbess_reference_revenue_stack.md" in methodology
     assert "not_a_market_index" in model_boundaries
     assert "not_a_market_index" in cache_contract
     assert "stack_series.parquet" in cache_contract
@@ -211,8 +263,7 @@ def test_release_docs_pin_preview_cache_and_trailing_12m_target() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     reproducibility = (ROOT / "docs/reproducibility.md").read_text(encoding="utf-8")
     cache_contract = (ROOT / "docs/dashboard_cache_contract.md").read_text(encoding="utf-8")
-    quality_gates = (ROOT / "docs/quality_gates.md").read_text(encoding="utf-8")
-    release_checklist = (ROOT / "docs/release_checklist.md").read_text(encoding="utf-8")
+    release_note = (ROOT / "docs/release_notes_v0.1.2.md").read_text(encoding="utf-8")
 
     for phrase in [
         "results/dashboard/release_90d_historical",
@@ -249,5 +300,5 @@ def test_release_docs_pin_preview_cache_and_trailing_12m_target() -> None:
     assert "`rolling_policy`: forecast model" in cache_contract
     assert "supplementary diagnostics" in cache_contract.replace("\n", " ")
     assert "present but empty" in cache_contract
-    assert "OpenBESS Stack Index Preview` to `OpenBESS Stack Index" in quality_gates
-    assert "target_window_eligible" in release_checklist
+    assert "trailing-12-month public evidence cache" in release_note
+    assert "target-window coverage" in release_note

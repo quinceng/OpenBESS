@@ -3,19 +3,19 @@
 Release date: 2026-05-20
 
 OpenBESS v0.1.0 is the first public research release. It packages the core GB
-BESS modelling workflow, the OpenBESS Stack Index preview, cached dashboard
+BESS modelling workflow, the OpenBESS Reference Revenue Stack preview, cached dashboard
 artefacts, and reproducible checks.
 
 ## Highlights
 
 - Added aligned Elexon MID and NESO EAC release-cache commands.
-- Added OpenBESS Stack Index CSV and parquet artefacts with coverage gates.
+- Added OpenBESS Reference Revenue Stack CSV and parquet artefacts with coverage gates.
 - Added source snapshot, assumptions ledger, data-quality summary, and forecast
   error sweep artefacts.
 - Added Capacity Market annual sidecar handling for finance outputs without
   mixing CM into settlement-period dispatch revenue.
 - Added dashboard coverage status, caveat display, forecast-error diagnostics,
-  and Stack Index preview labelling.
+  and Reference Revenue Stack preview labelling.
 - Kept annualised finance and benchmark values suppressed until longer coverage
   gates pass.
 
